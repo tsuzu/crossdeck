@@ -18,6 +18,18 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
+  // Explicitly deny all permission requests to avoid warnings
+  mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    callback(false);
+  });
+
+  // Handle webview permission requests - deny all
+  mainWindow.webContents.on('did-attach-webview', (event, webviewWebContents) => {
+    webviewWebContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+      callback(false);
+    });
+  });
+
   // Open DevTools in development mode
   if (process.argv.includes('--dev')) {
     mainWindow.webContents.openDevTools();
@@ -28,6 +40,13 @@ function createWindow() {
   });
 }
 
+// Setup session permissions - deny all to avoid warnings
+function setupSessionPermissions(profileSession: Session) {
+  profileSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    callback(false);
+  });
+}
+
 // Initialize default profiles
 function initializeProfiles() {
   const defaultProfiles = ['Profile 1', 'Profile 2', 'Profile 3'];
@@ -35,6 +54,7 @@ function initializeProfiles() {
   defaultProfiles.forEach(profileName => {
     const partition = `persist:${profileName.toLowerCase().replace(/\s+/g, '-')}`;
     const profileSession = session.fromPartition(partition);
+    setupSessionPermissions(profileSession);
     profiles.set(profileName, profileSession);
   });
 }
@@ -51,6 +71,7 @@ ipcMain.handle('create-profile', (event, profileName: string) => {
 
   const partition = `persist:${profileName.toLowerCase().replace(/\s+/g, '-')}`;
   const profileSession = session.fromPartition(partition);
+  setupSessionPermissions(profileSession);
   profiles.set(profileName, profileSession);
 
   return { success: true };

@@ -137,6 +137,7 @@ class XBrowser {
 
     webview.setAttribute('src', tab.url);
     webview.setAttribute('partition', partition);
+    webview.setAttribute('allowpopups', 'true');
     webview.dataset.tabId = tab.id;
 
     // Webview event listeners
@@ -151,6 +152,31 @@ class XBrowser {
 
     webview.addEventListener('did-navigate-in-page', (e) => {
       tab.url = (e as any).url;
+    });
+
+    // Disable WebAuthn API to prevent infinite loading
+    webview.addEventListener('dom-ready', () => {
+      webview.executeJavaScript(`
+        // Override navigator.credentials to immediately reject
+        if (navigator.credentials) {
+          Object.defineProperty(navigator, 'credentials', {
+            value: {
+              get: () => Promise.reject(new Error('WebAuthn not supported')),
+              create: () => Promise.reject(new Error('WebAuthn not supported')),
+              preventSilentAccess: () => Promise.resolve()
+            },
+            writable: false,
+            configurable: false
+          });
+        }
+
+        // Also override PublicKeyCredential if it exists
+        if (window.PublicKeyCredential) {
+          window.PublicKeyCredential = undefined;
+        }
+      `).catch((err: Error) => {
+        console.error('Failed to inject WebAuthn disable script:', err);
+      });
     });
 
     // Append webview to wrapper

@@ -9,6 +9,10 @@ A dedicated browser for X (formerly Twitter) with grid-based multi-profile suppo
 - **Profile-Based Tabs**: Each tab can use a different profile/account
 - **Clean Interface**: Dark-themed, distraction-free browsing experience
 
+## Limitations
+
+- **WebAuthn/Passkeys**: Not supported due to Electron sandboxing limitations. Use traditional password authentication instead.
+
 ## Installation
 
 ```bash
