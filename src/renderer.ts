@@ -1,0 +1,336 @@
+// Tab interface
+interface Tab {
+  id: string;
+  title: string;
+  url: string;
+  profile: string;
+  webview: Electron.WebviewTag | null;
+  wrapper: HTMLDivElement | null;
+}
+
+class XBrowser {
+  private tabs: Map<string, Tab> = new Map();
+  private activeTabId: string | null = null;
+  private profiles: string[] = [];
+  private selectedProfile: string = '';
+  private tabCounter: number = 0;
+
+  constructor() {
+    this.init();
+  }
+
+  async init() {
+    await this.loadProfiles();
+    this.setupEventListeners();
+    this.updateProfileSelect();
+
+    // Create initial tab with first profile if available
+    if (this.profiles.length > 0) {
+      this.selectedProfile = this.profiles[0];
+      document.querySelector<HTMLSelectElement>('#profile-select')!.value = this.selectedProfile;
+      this.createTab(this.selectedProfile);
+    }
+  }
+
+  async loadProfiles() {
+    this.profiles = await window.electronAPI.getProfiles();
+  }
+
+  setupEventListeners() {
+    // New tab button
+    document.getElementById('new-tab-btn')!.addEventListener('click', () => {
+      if (this.selectedProfile) {
+        this.createTab(this.selectedProfile);
+      } else {
+        alert('Please select a profile first');
+      }
+    });
+
+    // Profile select
+    document.getElementById('profile-select')!.addEventListener('change', (e) => {
+      this.selectedProfile = (e.target as HTMLSelectElement).value;
+    });
+
+    // Manage profiles button
+    document.getElementById('manage-profiles-btn')!.addEventListener('click', () => {
+      this.openProfileModal();
+    });
+
+    // Close modal
+    document.getElementById('close-modal-btn')!.addEventListener('click', () => {
+      this.closeProfileModal();
+    });
+
+    // Add profile
+    document.getElementById('add-profile-btn')!.addEventListener('click', () => {
+      this.addProfile();
+    });
+
+    // Enter key in profile input
+    document.getElementById('new-profile-name')!.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        this.addProfile();
+      }
+    });
+  }
+
+  createTab(profile: string) {
+    const tabId = `tab-${++this.tabCounter}`;
+
+    const tab: Tab = {
+      id: tabId,
+      title: 'X / Twitter',
+      url: 'https://twitter.com',
+      profile: profile,
+      webview: null,
+      wrapper: null
+    };
+
+    this.tabs.set(tabId, tab);
+    this.createTabElement(tab);
+    this.createWebview(tab);
+    this.activateTab(tabId);
+  }
+
+  createTabElement(tab: Tab) {
+    const tabBar = document.getElementById('tab-bar')!;
+    const tabElement = document.createElement('div');
+    tabElement.className = 'tab';
+    tabElement.dataset.tabId = tab.id;
+
+    const badge = document.createElement('span');
+    badge.className = 'tab-profile-badge';
+    badge.textContent = tab.profile;
+
+    const title = document.createElement('span');
+    title.className = 'tab-title';
+    title.textContent = tab.title;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'tab-close';
+    closeBtn.textContent = '×';
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.closeTab(tab.id);
+    });
+
+    tabElement.appendChild(badge);
+    tabElement.appendChild(title);
+    tabElement.appendChild(closeBtn);
+
+    tabElement.addEventListener('click', () => {
+      this.activateTab(tab.id);
+    });
+
+    tabBar.appendChild(tabElement);
+  }
+
+  async createWebview(tab: Tab) {
+    // Create wrapper div
+    const wrapper = document.createElement('div');
+    wrapper.className = 'webview-wrapper';
+    wrapper.dataset.tabId = tab.id;
+
+    // Create webview
+    const webview = document.createElement('webview') as Electron.WebviewTag;
+    const partition = await window.electronAPI.getPartition(tab.profile);
+
+    webview.setAttribute('src', tab.url);
+    webview.setAttribute('partition', partition);
+    webview.dataset.tabId = tab.id;
+
+    // Webview event listeners
+    webview.addEventListener('page-title-updated', (e) => {
+      tab.title = (e as any).title || 'X / Twitter';
+      this.updateTabTitle(tab.id);
+    });
+
+    webview.addEventListener('did-navigate', (e) => {
+      tab.url = (e as any).url;
+    });
+
+    webview.addEventListener('did-navigate-in-page', (e) => {
+      tab.url = (e as any).url;
+    });
+
+    // Append webview to wrapper
+    wrapper.appendChild(webview);
+
+    // Append wrapper to container
+    document.getElementById('views-container')!.appendChild(wrapper);
+
+    tab.webview = webview;
+    tab.wrapper = wrapper;
+  }
+
+  activateTab(tabId: string) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return;
+
+    // Update active tab tracking
+    this.activeTabId = tabId;
+
+    // Update tab elements
+    document.querySelectorAll('.tab').forEach(el => {
+      el.classList.remove('active');
+    });
+    const tabElement = document.querySelector(`.tab[data-tab-id="${tabId}"]`);
+    if (tabElement) {
+      tabElement.classList.add('active');
+    }
+
+    // Highlight active webview wrapper
+    document.querySelectorAll('.webview-wrapper').forEach(wrapper => {
+      wrapper.classList.remove('active');
+    });
+    if (tab.wrapper) {
+      tab.wrapper.classList.add('active');
+    }
+  }
+
+  updateTabTitle(tabId: string) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return;
+
+    const tabElement = document.querySelector(`[data-tab-id="${tabId}"] .tab-title`);
+    if (tabElement) {
+      tabElement.textContent = tab.title;
+    }
+  }
+
+  closeTab(tabId: string) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return;
+
+    // Remove wrapper (which contains the webview)
+    if (tab.wrapper) {
+      tab.wrapper.remove();
+    }
+
+    // Remove tab element
+    const tabElement = document.querySelector(`.tab[data-tab-id="${tabId}"]`);
+    if (tabElement) {
+      tabElement.remove();
+    }
+
+    // Remove from tabs map
+    this.tabs.delete(tabId);
+
+    // Activate another tab if this was active
+    if (this.activeTabId === tabId) {
+      const remainingTabs = Array.from(this.tabs.keys());
+      if (remainingTabs.length > 0) {
+        this.activateTab(remainingTabs[0]);
+      } else {
+        this.activeTabId = null;
+      }
+    }
+  }
+
+
+  updateProfileSelect() {
+    const select = document.querySelector<HTMLSelectElement>('#profile-select')!;
+    select.innerHTML = '<option value="">Select Profile</option>';
+
+    this.profiles.forEach(profile => {
+      const option = document.createElement('option');
+      option.value = profile;
+      option.textContent = profile;
+      select.appendChild(option);
+    });
+
+    if (this.selectedProfile) {
+      select.value = this.selectedProfile;
+    }
+  }
+
+  openProfileModal() {
+    this.updateProfileList();
+    document.getElementById('profile-modal')!.style.display = 'flex';
+  }
+
+  closeProfileModal() {
+    document.getElementById('profile-modal')!.style.display = 'none';
+  }
+
+  updateProfileList() {
+    const list = document.getElementById('profile-list')!;
+    list.innerHTML = '';
+
+    this.profiles.forEach(profile => {
+      const item = document.createElement('div');
+      item.className = 'profile-item';
+
+      const name = document.createElement('span');
+      name.className = 'profile-name';
+      name.textContent = profile;
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'profile-delete';
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.addEventListener('click', () => {
+        this.deleteProfile(profile);
+      });
+
+      item.appendChild(name);
+      item.appendChild(deleteBtn);
+      list.appendChild(item);
+    });
+  }
+
+  async addProfile() {
+    const input = document.querySelector<HTMLInputElement>('#new-profile-name')!;
+    const profileName = input.value.trim();
+
+    if (!profileName) {
+      alert('Please enter a profile name');
+      return;
+    }
+
+    const result = await window.electronAPI.createProfile(profileName);
+
+    if (result.success) {
+      await this.loadProfiles();
+      this.updateProfileList();
+      this.updateProfileSelect();
+      input.value = '';
+    } else {
+      alert(result.error || 'Failed to create profile');
+    }
+  }
+
+  async deleteProfile(profileName: string) {
+    // Check if any tabs are using this profile
+    const tabsUsingProfile = Array.from(this.tabs.values()).filter(
+      tab => tab.profile === profileName
+    );
+
+    if (tabsUsingProfile.length > 0) {
+      if (!confirm(`${tabsUsingProfile.length} tab(s) are using this profile. Close them and delete?`)) {
+        return;
+      }
+
+      // Close all tabs using this profile
+      tabsUsingProfile.forEach(tab => {
+        this.closeTab(tab.id);
+      });
+    }
+
+    const result = await window.electronAPI.deleteProfile(profileName);
+
+    if (result.success) {
+      await this.loadProfiles();
+      this.updateProfileList();
+      this.updateProfileSelect();
+
+      if (this.selectedProfile === profileName) {
+        this.selectedProfile = '';
+      }
+    } else {
+      alert(result.error || 'Failed to delete profile');
+    }
+  }
+}
+
+// Initialize the app when DOM is ready
+new XBrowser();

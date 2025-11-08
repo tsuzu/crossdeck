@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>X Browser</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top toolbar -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <button id="new-tab-btn" class="btn" title="New Tab">+</button>
+        <select id="profile-select" class="profile-select">
+          <option value="">Select Profile</option>
+        </select>
+        <button id="manage-profiles-btn" class="btn" title="Manage Profiles">⚙️</button>
+      </div>
+      <div class="toolbar-right">
+      </div>
+    </div>
+
+    <!-- Tab bar -->
+    <div class="tab-bar" id="tab-bar">
+      <!-- Tabs will be added dynamically -->
+    </div>
+
+    <!-- Browser views container -->
+    <div id="views-container" class="views-container">
+      <!-- Webviews will be inserted here in a grid -->
+    </div>
+  </div>
+
+  <!-- Profile Management Modal -->
+  <div id="profile-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Manage Profiles</h2>
+        <button id="close-modal-btn" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="profile-list" id="profile-list">
+          <!-- Profile items will be added here -->
+        </div>
+        <div class="add-profile-section">
+          <input type="text" id="new-profile-name" placeholder="New profile name" />
+          <button id="add-profile-btn" class="btn">Add Profile</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
