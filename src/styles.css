@@ -72,42 +72,26 @@ body {
   cursor: pointer;
 }
 
-/* Tab bar */
-.tab-bar {
-  display: flex;
-  gap: 4px;
-  padding: 6px 12px;
-  background: #252525;
-  border-bottom: 1px solid #3a3a3a;
-  overflow-x: auto;
-  overflow-y: hidden;
-  white-space: nowrap;
-  min-height: 40px;
-  flex-shrink: 0;
-}
-
-.tab {
+/* Tab header inside webview wrapper */
+.tab-header {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: #3a3a3a;
-  border: 1px solid #4a4a4a;
-  border-radius: 4px;
+  background: #2a2a2a;
+  border-bottom: 1px solid #3a3a3a;
   cursor: pointer;
   transition: background 0.2s;
-  min-width: 150px;
-  max-width: 250px;
+  flex-shrink: 0;
   height: 32px;
 }
 
-.tab:hover {
-  background: #4a4a4a;
+.tab-header:hover {
+  background: #3a3a3a;
 }
 
-.tab.active {
+.webview-wrapper.active .tab-header {
   background: #1da1f2;
-  border-color: #1da1f2;
 }
 
 .tab-profile-badge {
@@ -119,8 +103,8 @@ body {
   flex-shrink: 0;
 }
 
-.tab.active .tab-profile-badge {
-  background: rgba(255, 255, 255, 0.2);
+.webview-wrapper.active .tab-profile-badge {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .tab-title {
@@ -145,10 +129,11 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 3px;
+  flex-shrink: 0;
 }
 
 .tab-close:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 /* Views container */

@@ -87,16 +87,20 @@ class XBrowser {
     };
 
     this.tabs.set(tabId, tab);
-    this.createTabElement(tab);
     this.createWebview(tab);
     this.activateTab(tabId);
   }
 
-  createTabElement(tab: Tab) {
-    const tabBar = document.getElementById('tab-bar')!;
-    const tabElement = document.createElement('div');
-    tabElement.className = 'tab';
-    tabElement.dataset.tabId = tab.id;
+  async createWebview(tab: Tab) {
+    // Create wrapper div
+    const wrapper = document.createElement('div');
+    wrapper.className = 'webview-wrapper';
+    wrapper.dataset.tabId = tab.id;
+
+    // Create tab header
+    const tabHeader = document.createElement('div');
+    tabHeader.className = 'tab-header';
+    tabHeader.dataset.tabId = tab.id;
 
     const badge = document.createElement('span');
     badge.className = 'tab-profile-badge';
@@ -114,22 +118,16 @@ class XBrowser {
       this.closeTab(tab.id);
     });
 
-    tabElement.appendChild(badge);
-    tabElement.appendChild(title);
-    tabElement.appendChild(closeBtn);
+    tabHeader.appendChild(badge);
+    tabHeader.appendChild(title);
+    tabHeader.appendChild(closeBtn);
 
-    tabElement.addEventListener('click', () => {
+    tabHeader.addEventListener('click', () => {
       this.activateTab(tab.id);
     });
 
-    tabBar.appendChild(tabElement);
-  }
-
-  async createWebview(tab: Tab) {
-    // Create wrapper div
-    const wrapper = document.createElement('div');
-    wrapper.className = 'webview-wrapper';
-    wrapper.dataset.tabId = tab.id;
+    // Append tab header to wrapper
+    wrapper.appendChild(tabHeader);
 
     // Create webview
     const webview = document.createElement('webview') as Electron.WebviewTag;
@@ -196,15 +194,6 @@ class XBrowser {
     // Update active tab tracking
     this.activeTabId = tabId;
 
-    // Update tab elements
-    document.querySelectorAll('.tab').forEach(el => {
-      el.classList.remove('active');
-    });
-    const tabElement = document.querySelector(`.tab[data-tab-id="${tabId}"]`);
-    if (tabElement) {
-      tabElement.classList.add('active');
-    }
-
     // Highlight active webview wrapper
     document.querySelectorAll('.webview-wrapper').forEach(wrapper => {
       wrapper.classList.remove('active');
@@ -228,15 +217,9 @@ class XBrowser {
     const tab = this.tabs.get(tabId);
     if (!tab) return;
 
-    // Remove wrapper (which contains the webview)
+    // Remove wrapper (which contains the tab header and webview)
     if (tab.wrapper) {
       tab.wrapper.remove();
-    }
-
-    // Remove tab element
-    const tabElement = document.querySelector(`.tab[data-tab-id="${tabId}"]`);
-    if (tabElement) {
-      tabElement.remove();
     }
 
     // Remove from tabs map
