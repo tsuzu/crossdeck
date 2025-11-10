@@ -172,8 +172,30 @@ class XBrowser {
         if (window.PublicKeyCredential) {
           window.PublicKeyCredential = undefined;
         }
+
+        // Hide the Twitter/X header
+        const style = document.createElement('style');
+        style.textContent = \`
+          header[role="banner"] {
+            display: none !important;
+          }
+          /* Adjust main content to fill the space */
+          main {
+            margin-top: 0 !important;
+          }
+        \`;
+        document.head.appendChild(style);
+
+        // Also hide header dynamically if loaded later
+        const observer = new MutationObserver(() => {
+          const headers = document.querySelectorAll('header[role="banner"]');
+          headers.forEach(header => {
+            header.style.display = 'none';
+          });
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
       `).catch((err: Error) => {
-        console.error('Failed to inject WebAuthn disable script:', err);
+        console.error('Failed to inject custom scripts:', err);
       });
     });
 
