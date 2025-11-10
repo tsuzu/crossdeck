@@ -152,7 +152,7 @@ body {
 .webview-wrapper {
   position: relative;
   background: #1a1a1a;
-  min-width: 500px;
+  min-width: 300px;
   min-height: 0;
   overflow: hidden;
   display: flex;
