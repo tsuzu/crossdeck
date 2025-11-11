@@ -121,7 +121,18 @@ function setupMenuShortcuts() {
   const template: Electron.MenuItemConstructorOptions[] = [
     // Mac app menu (only on macOS)
     ...(isMac ? [{
-      role: 'appMenu' as const
+      label: 'crossdeck',
+      submenu: [
+        { role: 'about' as const },
+        { type: 'separator' as const },
+        { role: 'services' as const },
+        { type: 'separator' as const },
+        { role: 'hide' as const },
+        { role: 'hideOthers' as const },
+        { role: 'unhide' as const },
+        { type: 'separator' as const },
+        { role: 'quit' as const }
+      ]
     }] : []),
 
     // File menu
@@ -336,6 +347,9 @@ ipcMain.handle('get-profile-homepage', (event, profileName: string) => {
 ipcMain.handle('open-external', async (event, url: string) => {
   await shell.openExternal(url);
 });
+
+// Set application name
+app.setName('crossdeck');
 
 app.whenReady().then(() => {
   initializeProfiles();
