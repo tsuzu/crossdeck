@@ -59,7 +59,12 @@ jobs:
         run: echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
-        run: gh release create ${{ steps.get_tag.outputs.tag }} --generate-notes
+        run: |
+          if [[ "${{ steps.get_tag.outputs.tag }}" == *"-"* ]]; then
+            gh release create ${{ steps.get_tag.outputs.tag }} --generate-notes --prerelease
+          else
+            gh release create ${{ steps.get_tag.outputs.tag }} --generate-notes
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
