@@ -81,6 +81,13 @@ class CrossDeck {
       this.closeProfileModal();
     });
 
+    // Close modal when clicking outside
+    document.getElementById('profile-modal')!.addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) {
+        this.closeProfileModal();
+      }
+    });
+
     // Add profile
     document.getElementById('add-profile-btn')!.addEventListener('click', () => {
       this.addProfile();
