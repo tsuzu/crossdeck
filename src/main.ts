@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session, ipcMain, Session } from 'electron';
+import { app, BrowserWindow, session, ipcMain, Session, Menu } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -47,6 +47,9 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
+  // Setup keyboard shortcuts
+  setupMenuShortcuts();
+
   // Explicitly deny all permission requests to avoid warnings
   mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
     callback(false);
@@ -67,6 +70,56 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+}
+
+// Setup keyboard shortcuts using Menu accelerators
+function setupMenuShortcuts() {
+  const isMac = process.platform === 'darwin';
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    // Mac app menu (only on macOS)
+    ...(isMac ? [{
+      role: 'appMenu' as const
+    }] : []),
+
+    // File menu
+    { role: 'fileMenu' as const },
+
+    // Edit menu
+    { role: 'editMenu' as const },
+
+    // View menu with custom shortcuts
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' as const },
+        { role: 'forceReload' as const },
+        { role: 'toggleDevTools' as const },
+        { type: 'separator' as const },
+        { role: 'resetZoom' as const },
+        { role: 'zoomIn' as const },
+        { role: 'zoomOut' as const },
+        { type: 'separator' as const },
+        { role: 'togglefullscreen' as const },
+        { type: 'separator' as const },
+        // Add custom tab shortcuts (hidden but active)
+        ...Array.from({ length: 9 }, (_, i) => i + 1).map(i => ({
+          label: `Switch to Tab ${i}`,
+          accelerator: isMac ? `Cmd+${i}` : `Ctrl+${i}`,
+          visible: false,
+          click: () => {
+            mainWindow?.webContents.send('switch-tab-shortcut', i);
+          }
+        }))
+      ]
+    },
+
+    // Window menu
+    { role: 'windowMenu' as const }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
 }
 
 // Setup session permissions - deny all to avoid warnings

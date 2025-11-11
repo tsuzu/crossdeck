@@ -26,6 +26,11 @@ class XBrowser {
     this.setupEventListeners();
     this.updateProfileSelect();
 
+    // Setup keyboard shortcut listener
+    window.electronAPI.onSwitchTabShortcut((tabNumber) => {
+      this.focusTabByPosition(tabNumber - 1); // Convert to 0-based index
+    });
+
     // Load saved tabs or create initial tab
     const savedTabs = this.loadSavedTabs();
     if (savedTabs.length > 0) {
@@ -82,6 +87,21 @@ class XBrowser {
         this.addProfile();
       }
     });
+  }
+
+  focusTabByPosition(position: number) {
+    // Get tabs sorted by order
+    const sortedTabs = Array.from(this.tabs.values()).sort((a, b) => a.order - b.order);
+
+    if (position < sortedTabs.length) {
+      const tab = sortedTabs[position];
+      this.activateTab(tab.id);
+
+      // Focus the webview
+      if (tab.webview) {
+        tab.webview.focus();
+      }
+    }
   }
 
   async createTab(profile: string, url: string = 'https://twitter.com', order?: number) {
@@ -175,6 +195,11 @@ class XBrowser {
       this.saveTabs();
     });
 
+    // Activate tab when webview receives focus
+    webview.addEventListener('focus', () => {
+      this.activateTab(tab.id);
+    });
+
     // Disable WebAuthn API to prevent infinite loading
     webview.addEventListener('dom-ready', () => {
       webview.executeJavaScript(`
@@ -243,12 +268,27 @@ class XBrowser {
     // Update active tab tracking
     this.activeTabId = tabId;
 
-    // Highlight active webview wrapper
-    document.querySelectorAll('.webview-wrapper').forEach(wrapper => {
-      wrapper.classList.remove('active');
+    // Remove focus from all webviews and deactivate wrappers
+    this.tabs.forEach(t => {
+      if (t.wrapper) {
+        t.wrapper.classList.remove('active');
+      }
+      if (t.webview) {
+        // Remove focus from inactive webviews
+        if (t.id !== tabId) {
+          t.webview.blur();
+        }
+      }
     });
+
+    // Activate the selected tab
     if (tab.wrapper) {
       tab.wrapper.classList.add('active');
+    }
+
+    // Focus the active webview
+    if (tab.webview) {
+      tab.webview.focus();
     }
   }
 

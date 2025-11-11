@@ -9,6 +9,7 @@ declare global {
       deleteProfile: (profileName: string) => Promise<{ success: boolean; error?: string }>;
       renameProfile: (oldName: string, newName: string) => Promise<{ success: boolean; error?: string }>;
       getPartition: (profileName: string) => Promise<string>;
+      onSwitchTabShortcut: (callback: (tabNumber: number) => void) => void;
     };
   }
 }
