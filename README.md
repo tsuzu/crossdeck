@@ -1,4 +1,4 @@
-# X Browser
+# Crossdeck
 
 A dedicated browser for X (formerly Twitter) with grid-based multi-profile support.
 
