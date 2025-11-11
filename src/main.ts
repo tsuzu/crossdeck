@@ -2,35 +2,59 @@ import { app, BrowserWindow, session, ipcMain, Session, Menu } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 
+interface ProfileData {
+  name: string;
+  homepage: string;
+}
+
 let mainWindow: BrowserWindow | null = null;
-const profiles: Map<string, Session> = new Map();
+const profiles: Map<string, { session: Session; homepage: string }> = new Map();
 
 function getProfilesFilePath(): string {
   return path.join(app.getPath('userData'), 'profiles.json');
 }
 
 function saveProfilesToFile() {
-  const profileNames = Array.from(profiles.keys());
+  const profilesData: ProfileData[] = Array.from(profiles.entries()).map(([name, data]) => ({
+    name,
+    homepage: data.homepage
+  }));
   const filePath = getProfilesFilePath();
   try {
-    fs.writeFileSync(filePath, JSON.stringify(profileNames, null, 2));
+    fs.writeFileSync(filePath, JSON.stringify(profilesData, null, 2));
   } catch (err) {
     console.error('Failed to save profiles:', err);
   }
 }
 
-function loadProfilesFromFile(): string[] {
+function loadProfilesFromFile(): ProfileData[] {
   const filePath = getProfilesFilePath();
   try {
     if (fs.existsSync(filePath)) {
       const data = fs.readFileSync(filePath, 'utf-8');
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+
+      // Migration: Check if old format (string[])
+      if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
+        console.log('Migrating profiles from old format to new format');
+        return parsed.map(name => ({
+          name,
+          homepage: 'https://x.com'
+        }));
+      }
+
+      // New format (ProfileData[])
+      return parsed as ProfileData[];
     }
   } catch (err) {
     console.error('Failed to load profiles:', err);
   }
   // Return default profiles if file doesn't exist or error occurs
-  return ['Profile 1', 'Profile 2', 'Profile 3'];
+  return [
+    { name: 'Profile 1', homepage: 'https://x.com' },
+    { name: 'Profile 2', homepage: 'https://x.com' },
+    { name: 'Profile 3', homepage: 'https://x.com' }
+  ];
 }
 
 function createWindow() {
@@ -133,23 +157,29 @@ function setupSessionPermissions(profileSession: Session) {
 function initializeProfiles() {
   const savedProfiles = loadProfilesFromFile();
 
-  savedProfiles.forEach(profileName => {
-    const partition = `persist:${profileName.toLowerCase().replace(/\s+/g, '-')}`;
+  savedProfiles.forEach(profile => {
+    const partition = `persist:${profile.name.toLowerCase().replace(/\s+/g, '-')}`;
     const profileSession = session.fromPartition(partition);
     setupSessionPermissions(profileSession);
-    profiles.set(profileName, profileSession);
+    profiles.set(profile.name, {
+      session: profileSession,
+      homepage: profile.homepage
+    });
   });
 
-  // Save to file in case this is the first run
+  // Save to file in case this is the first run (triggers migration save if needed)
   saveProfilesToFile();
 }
 
 // IPC Handlers
 ipcMain.handle('get-profiles', () => {
-  return Array.from(profiles.keys());
+  return Array.from(profiles.entries()).map(([name, data]) => ({
+    name,
+    homepage: data.homepage
+  }));
 });
 
-ipcMain.handle('create-profile', (event, profileName: string) => {
+ipcMain.handle('create-profile', (event, profileName: string, homepage: string) => {
   if (profiles.has(profileName)) {
     return { success: false, error: 'Profile already exists' };
   }
@@ -157,7 +187,10 @@ ipcMain.handle('create-profile', (event, profileName: string) => {
   const partition = `persist:${profileName.toLowerCase().replace(/\s+/g, '-')}`;
   const profileSession = session.fromPartition(partition);
   setupSessionPermissions(profileSession);
-  profiles.set(profileName, profileSession);
+  profiles.set(profileName, {
+    session: profileSession,
+    homepage: homepage || 'https://x.com'
+  });
 
   saveProfilesToFile();
 
@@ -169,9 +202,9 @@ ipcMain.handle('delete-profile', async (event, profileName: string) => {
     return { success: false, error: 'Profile not found' };
   }
 
-  const profileSession = profiles.get(profileName);
-  if (profileSession) {
-    await profileSession.clearStorageData();
+  const profileData = profiles.get(profileName);
+  if (profileData) {
+    await profileData.session.clearStorageData();
   }
   profiles.delete(profileName);
 
@@ -180,6 +213,42 @@ ipcMain.handle('delete-profile', async (event, profileName: string) => {
   return { success: true };
 });
 
+ipcMain.handle('update-profile', (event, profileName: string, updates: { name?: string; homepage?: string }) => {
+  if (!profiles.has(profileName)) {
+    return { success: false, error: 'Profile not found' };
+  }
+
+  const profileData = profiles.get(profileName)!;
+  const newName = updates.name || profileName;
+  const newHomepage = updates.homepage !== undefined ? updates.homepage : profileData.homepage;
+
+  // If renaming, check if new name already exists
+  if (newName !== profileName && profiles.has(newName)) {
+    return { success: false, error: 'Profile with new name already exists' };
+  }
+
+  // If only updating homepage (no rename)
+  if (newName === profileName) {
+    profileData.homepage = newHomepage;
+    saveProfilesToFile();
+    return { success: true, renamed: false };
+  }
+
+  // If renaming, create new session with new name
+  profiles.delete(profileName);
+  const newPartition = `persist:${newName.toLowerCase().replace(/\s+/g, '-')}`;
+  const newSession = session.fromPartition(newPartition);
+  setupSessionPermissions(newSession);
+  profiles.set(newName, {
+    session: newSession,
+    homepage: newHomepage
+  });
+
+  saveProfilesToFile();
+  return { success: true, renamed: true };
+});
+
+// Keep old handler for backward compatibility
 ipcMain.handle('rename-profile', (event, oldName: string, newName: string) => {
   if (!profiles.has(oldName)) {
     return { success: false, error: 'Profile not found' };
@@ -189,31 +258,28 @@ ipcMain.handle('rename-profile', (event, oldName: string, newName: string) => {
     return { success: false, error: 'Profile with new name already exists' };
   }
 
-  // Get the old session
-  const oldSession = profiles.get(oldName);
-
-  // Remove old profile from map
+  const profileData = profiles.get(oldName)!;
   profiles.delete(oldName);
 
-  // Create new session with new name
   const newPartition = `persist:${newName.toLowerCase().replace(/\s+/g, '-')}`;
   const newSession = session.fromPartition(newPartition);
   setupSessionPermissions(newSession);
-
-  // Add new profile to map
-  profiles.set(newName, newSession);
+  profiles.set(newName, {
+    session: newSession,
+    homepage: profileData.homepage
+  });
 
   saveProfilesToFile();
-
-  // Note: The old session data will remain in the old partition
-  // You may want to copy data from old partition to new one if needed
-  // For now, this creates a fresh session with the new name
-
   return { success: true };
 });
 
 ipcMain.handle('get-partition', (event, profileName: string) => {
   return `persist:${profileName.toLowerCase().replace(/\s+/g, '-')}`;
+});
+
+ipcMain.handle('get-profile-homepage', (event, profileName: string) => {
+  const profileData = profiles.get(profileName);
+  return profileData ? profileData.homepage : 'https://x.com';
 });
 
 app.whenReady().then(() => {

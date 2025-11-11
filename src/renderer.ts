@@ -9,10 +9,15 @@ interface Tab {
   order: number;
 }
 
+interface ProfileData {
+  name: string;
+  homepage: string;
+}
+
 class CrossDeck {
   private tabs: Map<string, Tab> = new Map();
   private activeTabId: string | null = null;
-  private profiles: string[] = [];
+  private profiles: ProfileData[] = [];
   private selectedProfile: string = '';
   private tabCounter: number = 0;
   private draggedTabId: string | null = null;
@@ -41,7 +46,7 @@ class CrossDeck {
       }
     } else if (this.profiles.length > 0) {
       // Create initial tab with first profile if no saved tabs
-      this.selectedProfile = this.profiles[0];
+      this.selectedProfile = this.profiles[0].name;
       document.querySelector<HTMLSelectElement>('#profile-select')!.value = this.selectedProfile;
       await this.createTab(this.selectedProfile);
     }
@@ -81,8 +86,15 @@ class CrossDeck {
       this.addProfile();
     });
 
-    // Enter key in profile input
+    // Enter key in profile name input
     document.getElementById('new-profile-name')!.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        this.addProfile();
+      }
+    });
+
+    // Enter key in profile homepage input
+    document.getElementById('new-profile-homepage')!.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         this.addProfile();
       }
@@ -104,8 +116,14 @@ class CrossDeck {
     }
   }
 
-  async createTab(profile: string, url: string = 'https://twitter.com', order?: number) {
+  async createTab(profile: string, url?: string, order?: number) {
     const tabId = `tab-${++this.tabCounter}`;
+
+    // Get homepage from profile if url not specified
+    if (!url) {
+      const profileData = this.profiles.find(p => p.name === profile);
+      url = profileData ? profileData.homepage : 'https://x.com';
+    }
 
     const tab: Tab = {
       id: tabId,
@@ -365,8 +383,8 @@ class CrossDeck {
 
     this.profiles.forEach(profile => {
       const option = document.createElement('option');
-      option.value = profile;
-      option.textContent = profile;
+      option.value = profile.name;
+      option.textContent = profile.name;
       select.appendChild(option);
     });
 
@@ -391,60 +409,96 @@ class CrossDeck {
     this.profiles.forEach(profile => {
       const item = document.createElement('div');
       item.className = 'profile-item';
-      item.dataset.profile = profile;
+      item.dataset.profile = profile.name;
 
-      const name = document.createElement('span');
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'profile-info';
+
+      const name = document.createElement('div');
       name.className = 'profile-name';
-      name.textContent = profile;
+      name.textContent = profile.name;
+
+      const homepage = document.createElement('div');
+      homepage.className = 'profile-homepage';
+      homepage.textContent = profile.homepage;
+      homepage.style.fontSize = '12px';
+      homepage.style.color = '#888';
+      homepage.style.marginTop = '4px';
+
+      infoDiv.appendChild(name);
+      infoDiv.appendChild(homepage);
 
       const buttonGroup = document.createElement('div');
       buttonGroup.className = 'profile-buttons';
 
-      const renameBtn = document.createElement('button');
-      renameBtn.className = 'profile-rename';
-      renameBtn.textContent = 'Rename';
-      renameBtn.addEventListener('click', () => {
-        this.showRenameInput(item, profile);
+      const editBtn = document.createElement('button');
+      editBtn.className = 'profile-edit';
+      editBtn.textContent = 'Edit';
+      editBtn.addEventListener('click', () => {
+        this.showEditInput(item, profile);
       });
 
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'profile-delete';
       deleteBtn.textContent = 'Delete';
       deleteBtn.addEventListener('click', () => {
-        this.deleteProfile(profile);
+        this.deleteProfile(profile.name);
       });
 
-      buttonGroup.appendChild(renameBtn);
+      buttonGroup.appendChild(editBtn);
       buttonGroup.appendChild(deleteBtn);
 
-      item.appendChild(name);
+      item.appendChild(infoDiv);
       item.appendChild(buttonGroup);
       list.appendChild(item);
     });
   }
 
-  showRenameInput(item: HTMLElement, oldName: string) {
-    const nameSpan = item.querySelector('.profile-name') as HTMLElement;
+  showEditInput(item: HTMLElement, profile: ProfileData) {
+    const infoDiv = item.querySelector('.profile-info') as HTMLElement;
     const buttonGroup = item.querySelector('.profile-buttons') as HTMLElement;
 
-    // Hide current name and buttons
-    nameSpan.style.display = 'none';
+    // Hide current info and buttons
+    infoDiv.style.display = 'none';
     buttonGroup.style.display = 'none';
 
-    // Create input field
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'profile-rename-input';
-    input.value = oldName;
-    input.style.flex = '1';
-    input.style.padding = '6px 10px';
-    input.style.background = '#2a2a2a';
-    input.style.border = '1px solid #1da1f2';
-    input.style.borderRadius = '4px';
-    input.style.color = '#ffffff';
-    input.style.fontSize = '14px';
+    // Create edit form
+    const editForm = document.createElement('div');
+    editForm.className = 'profile-edit-form';
+    editForm.style.display = 'flex';
+    editForm.style.flexDirection = 'column';
+    editForm.style.gap = '8px';
+    editForm.style.flex = '1';
 
-    // Create confirm/cancel buttons
+    // Name input
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.placeholder = 'Profile name';
+    nameInput.value = profile.name;
+    nameInput.style.padding = '6px 10px';
+    nameInput.style.background = '#2a2a2a';
+    nameInput.style.border = '1px solid #1da1f2';
+    nameInput.style.borderRadius = '4px';
+    nameInput.style.color = '#ffffff';
+    nameInput.style.fontSize = '14px';
+
+    // Homepage input
+    const homepageInput = document.createElement('input');
+    homepageInput.type = 'text';
+    homepageInput.placeholder = 'Homepage URL';
+    homepageInput.value = profile.homepage;
+    homepageInput.style.padding = '6px 10px';
+    homepageInput.style.background = '#2a2a2a';
+    homepageInput.style.border = '1px solid #555';
+    homepageInput.style.borderRadius = '4px';
+    homepageInput.style.color = '#ffffff';
+    homepageInput.style.fontSize = '12px';
+
+    // Button container
+    const btnContainer = document.createElement('div');
+    btnContainer.style.display = 'flex';
+    btnContainer.style.gap = '8px';
+
     const confirmBtn = document.createElement('button');
     confirmBtn.textContent = '✓';
     confirmBtn.className = 'btn';
@@ -456,28 +510,51 @@ class CrossDeck {
     cancelBtn.className = 'btn';
     cancelBtn.style.padding = '6px 12px';
 
-    const inputGroup = document.createElement('div');
-    inputGroup.style.display = 'flex';
-    inputGroup.style.gap = '8px';
-    inputGroup.style.flex = '1';
-    inputGroup.appendChild(input);
-    inputGroup.appendChild(confirmBtn);
-    inputGroup.appendChild(cancelBtn);
+    btnContainer.appendChild(confirmBtn);
+    btnContainer.appendChild(cancelBtn);
 
-    item.insertBefore(inputGroup, buttonGroup);
-    input.focus();
-    input.select();
+    editForm.appendChild(nameInput);
+    editForm.appendChild(homepageInput);
+    editForm.appendChild(btnContainer);
+
+    item.insertBefore(editForm, buttonGroup);
+    nameInput.focus();
+    nameInput.select();
 
     const cleanup = () => {
-      inputGroup.remove();
-      nameSpan.style.display = '';
+      editForm.remove();
+      infoDiv.style.display = '';
       buttonGroup.style.display = '';
     };
 
     const confirm = async () => {
-      const newName = input.value.trim();
-      if (newName && newName !== oldName) {
-        await this.renameProfile(oldName, newName);
+      const newName = nameInput.value.trim();
+      const newHomepage = homepageInput.value.trim();
+
+      if (!newName) {
+        alert('Profile name cannot be empty');
+        return;
+      }
+
+      if (!newHomepage) {
+        alert('Homepage URL cannot be empty');
+        return;
+      }
+
+      // Validate URL
+      try {
+        new URL(newHomepage);
+      } catch {
+        alert('Invalid homepage URL');
+        return;
+      }
+
+      const updates: { name?: string; homepage?: string } = {};
+      if (newName !== profile.name) updates.name = newName;
+      if (newHomepage !== profile.homepage) updates.homepage = newHomepage;
+
+      if (Object.keys(updates).length > 0) {
+        await this.updateProfile(profile.name, updates);
       }
       cleanup();
     };
@@ -485,36 +562,52 @@ class CrossDeck {
     confirmBtn.addEventListener('click', confirm);
     cancelBtn.addEventListener('click', cleanup);
 
-    input.addEventListener('keydown', (e) => {
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        homepageInput.focus();
+      } else if (e.key === 'Escape') {
+        cleanup();
+      }
+    });
+
+    homepageInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         confirm();
       } else if (e.key === 'Escape') {
         cleanup();
       }
     });
-
-    input.addEventListener('blur', () => {
-      // Delay to allow button clicks to register
-      setTimeout(cleanup, 200);
-    });
   }
 
   async addProfile() {
-    const input = document.querySelector<HTMLInputElement>('#new-profile-name')!;
-    const profileName = input.value.trim();
+    const nameInput = document.querySelector<HTMLInputElement>('#new-profile-name')!;
+    const homepageInput = document.querySelector<HTMLInputElement>('#new-profile-homepage')!;
+
+    const profileName = nameInput.value.trim();
+    const homepage = homepageInput.value.trim() || 'https://x.com';
 
     if (!profileName) {
       alert('Please enter a profile name');
       return;
     }
 
-    const result = await window.electronAPI.createProfile(profileName);
+    // Validate URL
+    try {
+      new URL(homepage);
+    } catch {
+      alert('Invalid homepage URL');
+      return;
+    }
+
+    const result = await window.electronAPI.createProfile(profileName, homepage);
 
     if (result.success) {
       await this.loadProfiles();
       this.updateProfileList();
       this.updateProfileSelect();
-      input.value = '';
+      nameInput.value = '';
+      homepageInput.value = '';
     } else {
       alert(result.error || 'Failed to create profile');
     }
@@ -552,8 +645,50 @@ class CrossDeck {
     }
   }
 
+  async updateProfile(profileName: string, updates: { name?: string; homepage?: string }) {
+    // Check if new name conflicts
+    if (updates.name && this.profiles.some(p => p.name === updates.name && p.name !== profileName)) {
+      alert('A profile with this name already exists');
+      return;
+    }
+
+    const result = await window.electronAPI.updateProfile(profileName, updates);
+
+    if (result.success) {
+      // Update tabs if profile was renamed
+      if (result.renamed && updates.name) {
+        this.tabs.forEach(tab => {
+          if (tab.profile === profileName) {
+            tab.profile = updates.name!;
+            const badge = tab.wrapper?.querySelector('.tab-profile-badge');
+            if (badge) {
+              badge.textContent = updates.name!;
+            }
+          }
+        });
+
+        if (this.selectedProfile === profileName) {
+          this.selectedProfile = updates.name;
+        }
+
+        this.saveTabs();
+      }
+
+      // Reload profiles and update UI
+      await this.loadProfiles();
+      this.updateProfileList();
+      this.updateProfileSelect();
+
+      if (this.selectedProfile && updates.name) {
+        document.querySelector<HTMLSelectElement>('#profile-select')!.value = this.selectedProfile;
+      }
+    } else {
+      alert(result.error || 'Failed to update profile');
+    }
+  }
+
   async renameProfile(oldName: string, newName: string) {
-    if (this.profiles.includes(newName)) {
+    if (this.profiles.some(p => p.name === newName)) {
       alert('A profile with this name already exists');
       return;
     }

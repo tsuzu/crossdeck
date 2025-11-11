@@ -1,13 +1,21 @@
 // Type definitions for the exposed API
 export {};
 
+interface ProfileData {
+  name: string;
+  homepage: string;
+}
+
 declare global {
   interface Window {
     electronAPI: {
-      getProfiles: () => Promise<string[]>;
-      createProfile: (profileName: string) => Promise<{ success: boolean; error?: string }>;
+      getProfiles: () => Promise<ProfileData[]>;
+      createProfile: (profileName: string, homepage: string) => Promise<{ success: boolean; error?: string }>;
       deleteProfile: (profileName: string) => Promise<{ success: boolean; error?: string }>;
+      updateProfile: (profileName: string, updates: { name?: string; homepage?: string }) =>
+        Promise<{ success: boolean; error?: string; renamed?: boolean }>;
       renameProfile: (oldName: string, newName: string) => Promise<{ success: boolean; error?: string }>;
+      getProfileHomepage: (profileName: string) => Promise<string>;
       getPartition: (profileName: string) => Promise<string>;
       onSwitchTabShortcut: (callback: (tabNumber: number) => void) => void;
     };

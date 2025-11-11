@@ -268,7 +268,13 @@ body {
   gap: 8px;
 }
 
-.profile-rename {
+.profile-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-edit {
   background: #3498db;
   border: none;
   color: white;
@@ -279,7 +285,7 @@ body {
   transition: background 0.2s;
 }
 
-.profile-rename:hover {
+.profile-edit:hover {
   background: #2980b9;
 }
 
@@ -300,11 +306,11 @@ body {
 
 .add-profile-section {
   display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
 .add-profile-section input {
-  flex: 1;
   padding: 8px 12px;
   background: #3a3a3a;
   border: 1px solid #4a4a4a;
