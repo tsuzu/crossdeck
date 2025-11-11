@@ -16,18 +16,17 @@ on:
         description: 'Specific version to set (e.g., 1.2.3). Overrides version_type.'
         required: false
 
-permissions:
-  contents: write
-
 jobs:
   update_version:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v5.0.0
         with:
+          # We need to fetch all history and tags
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -53,3 +52,8 @@ jobs:
       - name: Push changes
         run: |
           git push --follow-tags
+      
+      - name: Trigger release workflow
+        run: gh workflow run release.yml --ref $(git rev-parse --abbrev-ref HEAD)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -51,6 +51,9 @@
     "directories": {
       "buildResources": "assets",
       "output": "release"
+    },
+    "publish": {
+      "provider": "github"
     }
   },
   "devDependencies": {
