@@ -7,6 +7,7 @@ interface Tab {
   webview: Electron.WebviewTag | null;
   wrapper: HTMLDivElement | null;
   order: number;
+  autoReloadIntervalId?: number;
 }
 
 interface ProfileData {
@@ -158,6 +159,67 @@ class CrossDeck {
     if (tab && tab.webview) {
       const currentZoom = tab.webview.getZoomLevel();
       tab.webview.setZoomLevel(currentZoom - 0.5);
+    }
+  }
+
+  setupAutoReload(tab: Tab) {
+    if (!tab.webview) return;
+
+    // Clear existing interval if any
+    if (tab.autoReloadIntervalId) {
+      clearInterval(tab.autoReloadIntervalId);
+    }
+
+    // Set up 15-second interval for auto-reload
+    tab.autoReloadIntervalId = window.setInterval(() => {
+      if (!tab.webview) return;
+
+      tab.webview.executeJavaScript(`
+        (function() {
+          try {
+            // Check if on x.com/home
+            const isHomePage =
+              (window.location.hostname.includes('x.com') &&
+                window.location.pathname === '/home') ||
+              (window.location.hostname.includes('mixi.social') &&
+                window.location.pathname === '/home') ||
+              (window.location.hostname.includes('bsky.app') &&
+                window.location.pathname === '/');
+
+            if (!isHomePage) return false;
+
+            // Check if scrolled to top
+            const isAtTop = window.scrollY == 0;
+
+            if (!isAtTop) return false;
+
+            // Find and click the home link
+            const homeLink = document.querySelector('a[href="/home"]') || document.querySelectorAll('a[href="/"]');
+            if (homeLink) {
+              homeLink.click();
+              return true;
+            }
+
+            return false;
+          } catch (e) {
+            console.error('Auto-reload error:', e);
+            return false;
+          }
+        })();
+      `).then((clicked) => {
+        if (clicked) {
+          console.log(`Auto-reload triggered for tab ${tab.id}`);
+        }
+      }).catch((err) => {
+        console.error('Auto-reload execution error:', err);
+      });
+    }, 15000); // 15 seconds
+  }
+
+  clearAutoReload(tab: Tab) {
+    if (tab.autoReloadIntervalId) {
+      clearInterval(tab.autoReloadIntervalId);
+      tab.autoReloadIntervalId = undefined;
     }
   }
 
@@ -319,6 +381,9 @@ class CrossDeck {
       `).catch((err: Error) => {
         console.error('Failed to inject custom scripts:', err);
       });
+
+      // Setup auto-reload after DOM is ready
+      this.setupAutoReload(tab);
     });
 
     // Append webview to wrapper
@@ -382,6 +447,9 @@ class CrossDeck {
   closeTab(tabId: string) {
     const tab = this.tabs.get(tabId);
     if (!tab) return;
+
+    // Clear auto-reload timer
+    this.clearAutoReload(tab);
 
     // Remove wrapper (which contains the tab header and webview)
     if (tab.wrapper) {
