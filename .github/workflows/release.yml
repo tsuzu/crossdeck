@@ -22,6 +22,6 @@ jobs:
       - name: Install dependencies
         run: npm install
       - name: Build and package
-        run: npm run dist
+        run: npm run dist -- -p always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
