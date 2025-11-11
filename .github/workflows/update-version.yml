@@ -22,6 +22,7 @@ jobs:
     permissions:
       contents: write
       actions: write
+      pull-requests: write
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v5.0.0
@@ -52,6 +53,15 @@ jobs:
       - name: Push changes
         run: |
           git push --follow-tags
+
+      - name: Get new tag
+        id: get_tag
+        run: echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        run: gh release create ${{ steps.get_tag.outputs.tag }} --generate-notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Trigger release workflow
         run: gh workflow run release.yml --ref $(git rev-parse --abbrev-ref HEAD)
