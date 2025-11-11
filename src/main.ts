@@ -149,9 +149,27 @@ function setupMenuShortcuts() {
         { role: 'forceReload' as const },
         { role: 'toggleDevTools' as const },
         { type: 'separator' as const },
-        { role: 'resetZoom' as const },
-        { role: 'zoomIn' as const },
-        { role: 'zoomOut' as const },
+        {
+          label: 'Reset Zoom',
+          accelerator: isMac ? 'Cmd+0' : 'Ctrl+0',
+          click: () => {
+            mainWindow?.webContents.send('zoom-reset');
+          }
+        },
+        {
+          label: 'Zoom In',
+          accelerator: isMac ? 'Cmd+Plus' : 'Ctrl+Plus',
+          click: () => {
+            mainWindow?.webContents.send('zoom-in');
+          }
+        },
+        {
+          label: 'Zoom Out',
+          accelerator: isMac ? 'Cmd+-' : 'Ctrl+-',
+          click: () => {
+            mainWindow?.webContents.send('zoom-out');
+          }
+        },
         { type: 'separator' as const },
         { role: 'togglefullscreen' as const },
         { type: 'separator' as const },

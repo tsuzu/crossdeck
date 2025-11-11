@@ -20,6 +20,9 @@ declare global {
       getPartition: (profileName: string) => Promise<string>;
       openExternal: (url: string) => Promise<void>;
       onSwitchTabShortcut: (callback: (tabNumber: number) => void) => void;
+      onZoomReset: (callback: () => void) => void;
+      onZoomIn: (callback: () => void) => void;
+      onZoomOut: (callback: () => void) => void;
     };
   }
 }
