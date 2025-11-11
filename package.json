@@ -1,6 +1,6 @@
 {
   "name": "crossdeck",
-  "version": "0.0.1-beta.6",
+  "version": "0.0.1-beta.7",
   "description": "Dedicated X (Twitter) browser with vertical split tabs and multi-profile support",
   "main": "dist/main.js",
   "scripts": {
