@@ -21,6 +21,10 @@
   "build": {
     "appId": "com.crossdeck.app",
     "productName": "crossdeck",
+    "publish": {
+      "provider": "github",
+      "releaseType": "release"
+    },
     "mac": {
       "category": "public.app-category.social-networking",
       "target": [
