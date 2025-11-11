@@ -2,6 +2,10 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., v1.2.3). Must exist in the repository.'
+        required: true
 
 permissions:
   contents: write
@@ -15,6 +19,9 @@ jobs:
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v5.0.0
+        with:
+          ref: ${{ github.event.inputs.tag }}
+          fetch-depth: 0
       - name: Set up Node.js
         uses: actions/setup-node@v6.0.0
         with:

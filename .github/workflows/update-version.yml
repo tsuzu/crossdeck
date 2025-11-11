@@ -64,6 +64,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Trigger release workflow
-        run: gh workflow run release.yml --ref $(git rev-parse --abbrev-ref HEAD)
+        run: gh workflow run release.yml --ref $(git rev-parse --abbrev-ref HEAD) --field tag=${{ steps.get_tag.outputs.tag }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
