@@ -51,9 +51,7 @@ function loadProfilesFromFile(): ProfileData[] {
   }
   // Return default profiles if file doesn't exist or error occurs
   return [
-    { name: 'Profile 1', homepage: 'https://x.com' },
-    { name: 'Profile 2', homepage: 'https://x.com' },
-    { name: 'Profile 3', homepage: 'https://x.com' }
+    { name: 'Default', homepage: 'https://x.com' },
   ];
 }
 
