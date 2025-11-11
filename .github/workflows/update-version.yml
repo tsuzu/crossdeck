@@ -1,0 +1,48 @@
+name: Update Version and Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version type to increment (patch, minor, or major)'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  update_version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v5.0.0
+        with:
+          # We need to fetch all history and tags
+          fetch-depth: 0
+          # Using a PAT with repo scope is required to trigger the release workflow.
+          # The default GITHUB_TOKEN does not have sufficient permissions.
+          # You need to create a secret named PAT in your repository settings.
+          token: ${{ secrets.PAT }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6.0.0
+        with:
+          node-version: 22
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update version and create tag
+        run: |
+          npm version ${{ github.event.inputs.version_type }} -m "chore: bump version to %s"
+      
+      - name: Push changes
+        run: |
+          git push --follow-tags
