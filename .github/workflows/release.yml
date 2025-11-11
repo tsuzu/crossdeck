@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v5.0.0
+      - name: Set up Node.js
+        uses: actions/setup-node@v6.0.0
+        with:
+          node-version: 18
+      - name: Install dependencies
+        run: npm install
+      - name: Build and package
+        run: npm run dist
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v5.0.0
+        with:
+          name: ${{ matrix.os }}-build
+          path: release
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v6.0.0
+        with:
+          path: artifacts
+      - name: Release
+        uses: softprops/action-gh-release@v2.4.2
+        with:
+          files: |
+            artifacts/macos-latest-build/*
+            artifacts/ubuntu-latest-build/*
+            artifacts/windows-latest-build/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

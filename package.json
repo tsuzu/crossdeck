@@ -38,6 +38,12 @@
         }
       ]
     },
+    "linux": {
+      "target": "AppImage"
+    },
+    "win": {
+      "target": "nsis"
+    },
     "files": [
       "dist/**/*",
       "package.json"
