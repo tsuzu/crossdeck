@@ -9,7 +9,7 @@ interface Tab {
   order: number;
 }
 
-class XBrowser {
+class CrossDeck {
   private tabs: Map<string, Tab> = new Map();
   private activeTabId: string | null = null;
   private profiles: string[] = [];
@@ -284,6 +284,13 @@ class XBrowser {
     // Activate the selected tab
     if (tab.wrapper) {
       tab.wrapper.classList.add('active');
+
+      // Scroll into view if not visible
+      tab.wrapper.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'nearest'
+      });
     }
 
     // Focus the active webview
@@ -671,4 +678,4 @@ class XBrowser {
 }
 
 // Initialize the app when DOM is ready
-new XBrowser();
+new CrossDeck();

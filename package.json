@@ -1,5 +1,5 @@
 {
-  "name": "xbrowser",
+  "name": "crossdeck",
   "version": "1.0.0",
   "description": "Dedicated X (Twitter) browser with vertical split tabs and multi-profile support",
   "main": "dist/main.js",
@@ -19,8 +19,8 @@
   "author": "",
   "license": "MIT",
   "build": {
-    "appId": "com.xbrowser.app",
-    "productName": "X Browser",
+    "appId": "com.crossdeck.app",
+    "productName": "crossdeck",
     "mac": {
       "category": "public.app-category.social-networking",
       "target": [
