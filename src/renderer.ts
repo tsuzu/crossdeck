@@ -37,6 +37,17 @@ class CrossDeck {
       this.focusTabByPosition(tabNumber - 1); // Convert to 0-based index
     });
 
+    // Setup zoom listeners
+    window.electronAPI.onZoomReset(() => {
+      this.zoomReset();
+    });
+    window.electronAPI.onZoomIn(() => {
+      this.zoomIn();
+    });
+    window.electronAPI.onZoomOut(() => {
+      this.zoomOut();
+    });
+
     // Load saved tabs or create initial tab
     const savedTabs = this.loadSavedTabs();
     if (savedTabs.length > 0) {
@@ -121,6 +132,32 @@ class CrossDeck {
       if (tab.webview) {
         tab.webview.focus();
       }
+    }
+  }
+
+  zoomReset() {
+    if (!this.activeTabId) return;
+    const tab = this.tabs.get(this.activeTabId);
+    if (tab && tab.webview) {
+      tab.webview.setZoomLevel(0);
+    }
+  }
+
+  zoomIn() {
+    if (!this.activeTabId) return;
+    const tab = this.tabs.get(this.activeTabId);
+    if (tab && tab.webview) {
+      const currentZoom = tab.webview.getZoomLevel();
+      tab.webview.setZoomLevel(currentZoom + 0.5);
+    }
+  }
+
+  zoomOut() {
+    if (!this.activeTabId) return;
+    const tab = this.tabs.get(this.activeTabId);
+    if (tab && tab.webview) {
+      const currentZoom = tab.webview.getZoomLevel();
+      tab.webview.setZoomLevel(currentZoom - 0.5);
     }
   }
 

@@ -20,5 +20,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('switch-tab-shortcut', (_event, tabNumber: number) => {
       callback(tabNumber);
     });
+  },
+  onZoomReset: (callback: () => void) => {
+    ipcRenderer.on('zoom-reset', () => {
+      callback();
+    });
+  },
+  onZoomIn: (callback: () => void) => {
+    ipcRenderer.on('zoom-in', () => {
+      callback();
+    });
+  },
+  onZoomOut: (callback: () => void) => {
+    ipcRenderer.on('zoom-out', () => {
+      callback();
+    });
   }
 });
