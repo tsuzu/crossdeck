@@ -24,11 +24,18 @@ class XBrowser {
     this.setupEventListeners();
     this.updateProfileSelect();
 
-    // Create initial tab with first profile if available
-    if (this.profiles.length > 0) {
+    // Load saved tabs or create initial tab
+    const savedTabs = this.loadSavedTabs();
+    if (savedTabs.length > 0) {
+      // Restore saved tabs
+      for (const savedTab of savedTabs) {
+        await this.createTab(savedTab.profile, savedTab.url);
+      }
+    } else if (this.profiles.length > 0) {
+      // Create initial tab with first profile if no saved tabs
       this.selectedProfile = this.profiles[0];
       document.querySelector<HTMLSelectElement>('#profile-select')!.value = this.selectedProfile;
-      this.createTab(this.selectedProfile);
+      await this.createTab(this.selectedProfile);
     }
   }
 
@@ -74,21 +81,22 @@ class XBrowser {
     });
   }
 
-  createTab(profile: string) {
+  async createTab(profile: string, url: string = 'https://twitter.com') {
     const tabId = `tab-${++this.tabCounter}`;
 
     const tab: Tab = {
       id: tabId,
       title: 'X / Twitter',
-      url: 'https://twitter.com',
+      url: url,
       profile: profile,
       webview: null,
       wrapper: null
     };
 
     this.tabs.set(tabId, tab);
-    this.createWebview(tab);
+    await this.createWebview(tab);
     this.activateTab(tabId);
+    this.saveTabs();
   }
 
   async createWebview(tab: Tab) {
@@ -124,6 +132,7 @@ class XBrowser {
 
     tabHeader.addEventListener('click', () => {
       this.activateTab(tab.id);
+      console.log("clicked", tab.id);
     });
 
     // Append tab header to wrapper
@@ -146,10 +155,12 @@ class XBrowser {
 
     webview.addEventListener('did-navigate', (e) => {
       tab.url = (e as any).url;
+      this.saveTabs();
     });
 
     webview.addEventListener('did-navigate-in-page', (e) => {
       tab.url = (e as any).url;
+      this.saveTabs();
     });
 
     // Disable WebAuthn API to prevent infinite loading
@@ -260,6 +271,29 @@ class XBrowser {
         this.activeTabId = null;
       }
     }
+
+    // Save tabs after closing
+    this.saveTabs();
+  }
+
+  saveTabs() {
+    const tabsToSave = Array.from(this.tabs.values()).map(tab => ({
+      url: tab.url,
+      profile: tab.profile
+    }));
+    localStorage.setItem('xbrowser-tabs', JSON.stringify(tabsToSave));
+  }
+
+  loadSavedTabs(): Array<{ url: string; profile: string }> {
+    try {
+      const saved = localStorage.getItem('xbrowser-tabs');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (err) {
+      console.error('Failed to load saved tabs:', err);
+    }
+    return [];
   }
 
 
