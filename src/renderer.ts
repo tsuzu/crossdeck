@@ -218,6 +218,13 @@ class CrossDeck {
       this.activateTab(tab.id);
     });
 
+    // Open external links in default browser
+    webview.addEventListener('new-window', (e) => {
+      e.preventDefault();
+      const url = (e as any).url;
+      window.electronAPI.openExternal(url);
+    });
+
     // Disable WebAuthn API to prevent infinite loading
     webview.addEventListener('dom-ready', () => {
       webview.executeJavaScript(`

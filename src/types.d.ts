@@ -17,6 +17,7 @@ declare global {
       renameProfile: (oldName: string, newName: string) => Promise<{ success: boolean; error?: string }>;
       getProfileHomepage: (profileName: string) => Promise<string>;
       getPartition: (profileName: string) => Promise<string>;
+      openExternal: (url: string) => Promise<void>;
       onSwitchTabShortcut: (callback: (tabNumber: number) => void) => void;
     };
   }

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session, ipcMain, Session, Menu } from 'electron';
+import { app, BrowserWindow, session, ipcMain, Session, Menu, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -81,6 +81,12 @@ function createWindow() {
   mainWindow.webContents.on('did-attach-webview', (event, webviewWebContents) => {
     webviewWebContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
       callback(false);
+    });
+
+    // Open external links in default browser
+    webviewWebContents.setWindowOpenHandler(({ url }) => {
+      shell.openExternal(url);
+      return { action: 'deny' };
     });
   });
 
@@ -278,6 +284,10 @@ ipcMain.handle('get-partition', (event, profileName: string) => {
 ipcMain.handle('get-profile-homepage', (event, profileName: string) => {
   const profileData = profiles.get(profileName);
   return profileData ? profileData.homepage : 'https://x.com';
+});
+
+ipcMain.handle('open-external', async (event, url: string) => {
+  await shell.openExternal(url);
 });
 
 app.whenReady().then(() => {
