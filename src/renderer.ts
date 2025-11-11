@@ -8,6 +8,7 @@ interface Tab {
   wrapper: HTMLDivElement | null;
   order: number;
   autoReloadIntervalId?: number;
+  autoReloadEnabled: boolean;
 }
 
 interface ProfileData {
@@ -55,7 +56,12 @@ class CrossDeck {
       // Restore saved tabs in order
       const sortedTabs = savedTabs.sort((a, b) => (a.order || 0) - (b.order || 0));
       for (const savedTab of sortedTabs) {
-        await this.createTab(savedTab.profile, savedTab.url, savedTab.order);
+        await this.createTab(
+          savedTab.profile,
+          savedTab.url,
+          savedTab.order,
+          savedTab.autoReloadEnabled !== undefined ? savedTab.autoReloadEnabled : true
+        );
       }
     } else if (this.profiles.length > 0) {
       // Create initial tab with first profile if no saved tabs
@@ -163,7 +169,7 @@ class CrossDeck {
   }
 
   setupAutoReload(tab: Tab) {
-    if (!tab.webview) return;
+    if (!tab.webview || !tab.autoReloadEnabled) return;
 
     // Clear existing interval if any
     if (tab.autoReloadIntervalId) {
@@ -223,7 +229,40 @@ class CrossDeck {
     }
   }
 
-  async createTab(profile: string, url?: string, order?: number) {
+  toggleAutoReload(tabId: string) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return;
+
+    tab.autoReloadEnabled = !tab.autoReloadEnabled;
+
+    // Update button state
+    const button = document.querySelector(`button.tab-auto-reload[data-tab-id="${tabId}"]`);
+    if (button) {
+      this.updateAutoReloadButton(button as HTMLButtonElement, tab.autoReloadEnabled);
+    }
+
+    // Start or stop auto-reload based on new state
+    if (tab.autoReloadEnabled) {
+      this.setupAutoReload(tab);
+    } else {
+      this.clearAutoReload(tab);
+    }
+
+    // Save state
+    this.saveTabs();
+  }
+
+  updateAutoReloadButton(button: HTMLButtonElement, enabled: boolean) {
+    if (enabled) {
+      button.classList.add('enabled');
+      button.title = 'Auto-reload enabled (click to disable)';
+    } else {
+      button.classList.remove('enabled');
+      button.title = 'Auto-reload disabled (click to enable)';
+    }
+  }
+
+  async createTab(profile: string, url?: string, order?: number, autoReloadEnabled?: boolean) {
     const tabId = `tab-${++this.tabCounter}`;
 
     // Get homepage from profile if url not specified
@@ -239,7 +278,8 @@ class CrossDeck {
       profile: profile,
       webview: null,
       wrapper: null,
-      order: order !== undefined ? order : this.tabs.size
+      order: order !== undefined ? order : this.tabs.size,
+      autoReloadEnabled: autoReloadEnabled !== undefined ? autoReloadEnabled : true  // Auto-reload enabled by default
     };
 
     this.tabs.set(tabId, tab);
@@ -268,6 +308,18 @@ class CrossDeck {
     title.className = 'tab-title';
     title.textContent = tab.title;
 
+    // Auto-reload toggle button
+    const autoReloadBtn = document.createElement('button');
+    autoReloadBtn.className = 'tab-auto-reload';
+    autoReloadBtn.dataset.tabId = tab.id;
+    autoReloadBtn.textContent = '🔄';
+    autoReloadBtn.title = 'Toggle auto-reload';
+    this.updateAutoReloadButton(autoReloadBtn, tab.autoReloadEnabled);
+    autoReloadBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleAutoReload(tab.id);
+    });
+
     const closeBtn = document.createElement('button');
     closeBtn.className = 'tab-close';
     closeBtn.textContent = '×';
@@ -278,6 +330,7 @@ class CrossDeck {
 
     tabHeader.appendChild(badge);
     tabHeader.appendChild(title);
+    tabHeader.appendChild(autoReloadBtn);
     tabHeader.appendChild(closeBtn);
 
     tabHeader.addEventListener('click', () => {
@@ -479,12 +532,13 @@ class CrossDeck {
       .map(tab => ({
         url: tab.url,
         profile: tab.profile,
-        order: tab.order
+        order: tab.order,
+        autoReloadEnabled: tab.autoReloadEnabled
       }));
     localStorage.setItem('xbrowser-tabs', JSON.stringify(tabsToSave));
   }
 
-  loadSavedTabs(): Array<{ url: string; profile: string; order: number }> {
+  loadSavedTabs(): Array<{ url: string; profile: string; order: number; autoReloadEnabled?: boolean }> {
     try {
       const saved = localStorage.getItem('xbrowser-tabs');
       if (saved) {
