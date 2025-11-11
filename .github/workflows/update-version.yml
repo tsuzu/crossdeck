@@ -4,14 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       version_type:
-        description: 'Version type to increment (patch, minor, or major)'
-        required: true
+        description: 'Version type to increment (patch, minor, or major). Do not use with specific_version.'
+        required: false
         default: 'patch'
         type: choice
         options:
           - patch
           - minor
           - major
+      specific_version:
+        description: 'Specific version to set (e.g., 1.2.3). Overrides version_type.'
+        required: false
 
 jobs:
   update_version:
@@ -32,7 +35,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6.0.0
         with:
-          node-version: 22
+          node-version: 18
 
       - name: Configure Git
         run: |
@@ -40,8 +43,13 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Update version and create tag
+        id: version
         run: |
-          npm version ${{ github.event.inputs.version_type }} -m "chore: bump version to %s"
+          if [ -n "${{ github.event.inputs.specific_version }}" ]; then
+            npm version ${{ github.event.inputs.specific_version }} -m "chore: bump version to %s"
+          else
+            npm version ${{ github.event.inputs.version_type }} -m "chore: bump version to %s"
+          fi
       
       - name: Push changes
         run: |
