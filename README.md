@@ -1,6 +1,8 @@
-# Crossdeck
+# Crossdeck <img src="./assets/icon.png" width="32px">
 
 Old Tweetdeck Alternative
+
+<img src="./assets/preview.png">
 
 ## Features
 
