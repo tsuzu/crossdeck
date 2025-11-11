@@ -344,10 +344,21 @@ class XBrowser {
     this.profiles.forEach(profile => {
       const item = document.createElement('div');
       item.className = 'profile-item';
+      item.dataset.profile = profile;
 
       const name = document.createElement('span');
       name.className = 'profile-name';
       name.textContent = profile;
+
+      const buttonGroup = document.createElement('div');
+      buttonGroup.className = 'profile-buttons';
+
+      const renameBtn = document.createElement('button');
+      renameBtn.className = 'profile-rename';
+      renameBtn.textContent = 'Rename';
+      renameBtn.addEventListener('click', () => {
+        this.showRenameInput(item, profile);
+      });
 
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'profile-delete';
@@ -356,9 +367,88 @@ class XBrowser {
         this.deleteProfile(profile);
       });
 
+      buttonGroup.appendChild(renameBtn);
+      buttonGroup.appendChild(deleteBtn);
+
       item.appendChild(name);
-      item.appendChild(deleteBtn);
+      item.appendChild(buttonGroup);
       list.appendChild(item);
+    });
+  }
+
+  showRenameInput(item: HTMLElement, oldName: string) {
+    const nameSpan = item.querySelector('.profile-name') as HTMLElement;
+    const buttonGroup = item.querySelector('.profile-buttons') as HTMLElement;
+
+    // Hide current name and buttons
+    nameSpan.style.display = 'none';
+    buttonGroup.style.display = 'none';
+
+    // Create input field
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'profile-rename-input';
+    input.value = oldName;
+    input.style.flex = '1';
+    input.style.padding = '6px 10px';
+    input.style.background = '#2a2a2a';
+    input.style.border = '1px solid #1da1f2';
+    input.style.borderRadius = '4px';
+    input.style.color = '#ffffff';
+    input.style.fontSize = '14px';
+
+    // Create confirm/cancel buttons
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = '✓';
+    confirmBtn.className = 'btn';
+    confirmBtn.style.padding = '6px 12px';
+    confirmBtn.style.background = '#27ae60';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = '✗';
+    cancelBtn.className = 'btn';
+    cancelBtn.style.padding = '6px 12px';
+
+    const inputGroup = document.createElement('div');
+    inputGroup.style.display = 'flex';
+    inputGroup.style.gap = '8px';
+    inputGroup.style.flex = '1';
+    inputGroup.appendChild(input);
+    inputGroup.appendChild(confirmBtn);
+    inputGroup.appendChild(cancelBtn);
+
+    item.insertBefore(inputGroup, buttonGroup);
+    input.focus();
+    input.select();
+
+    const cleanup = () => {
+      inputGroup.remove();
+      nameSpan.style.display = '';
+      buttonGroup.style.display = '';
+    };
+
+    const confirm = async () => {
+      const newName = input.value.trim();
+      if (newName && newName !== oldName) {
+        await this.renameProfile(oldName, newName);
+      }
+      cleanup();
+    };
+
+    confirmBtn.addEventListener('click', confirm);
+    cancelBtn.addEventListener('click', cleanup);
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        confirm();
+      } else if (e.key === 'Escape') {
+        cleanup();
+      }
+    });
+
+    input.addEventListener('blur', () => {
+      // Delay to allow button clicks to register
+      setTimeout(cleanup, 200);
     });
   }
 
@@ -412,6 +502,49 @@ class XBrowser {
       }
     } else {
       alert(result.error || 'Failed to delete profile');
+    }
+  }
+
+  async renameProfile(oldName: string, newName: string) {
+    if (this.profiles.includes(newName)) {
+      alert('A profile with this name already exists');
+      return;
+    }
+
+    const result = await window.electronAPI.renameProfile(oldName, newName);
+
+    if (result.success) {
+      // Update all tabs using this profile
+      this.tabs.forEach(tab => {
+        if (tab.profile === oldName) {
+          tab.profile = newName;
+          // Update the badge text in the tab header
+          const badge = tab.wrapper?.querySelector('.tab-profile-badge');
+          if (badge) {
+            badge.textContent = newName;
+          }
+        }
+      });
+
+      // Update selected profile if it was the renamed one
+      if (this.selectedProfile === oldName) {
+        this.selectedProfile = newName;
+      }
+
+      // Reload profiles and update UI
+      await this.loadProfiles();
+      this.updateProfileList();
+      this.updateProfileSelect();
+
+      // Update selected profile in dropdown
+      if (this.selectedProfile === newName) {
+        document.querySelector<HTMLSelectElement>('#profile-select')!.value = newName;
+      }
+
+      // Save tabs with updated profile names
+      this.saveTabs();
+    } else {
+      alert(result.error || 'Failed to rename profile');
     }
   }
 

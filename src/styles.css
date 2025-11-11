@@ -263,6 +263,26 @@ body {
   font-weight: 500;
 }
 
+.profile-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.profile-rename {
+  background: #3498db;
+  border: none;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+
+.profile-rename:hover {
+  background: #2980b9;
+}
+
 .profile-delete {
   background: #e74c3c;
   border: none;
@@ -271,6 +291,7 @@ body {
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
+  transition: background 0.2s;
 }
 
 .profile-delete:hover {
