@@ -6,6 +6,7 @@ interface Tab {
   profile: string;
   webview: Electron.WebviewTag | null;
   wrapper: HTMLDivElement | null;
+  order: number;
 }
 
 class XBrowser {
@@ -14,6 +15,7 @@ class XBrowser {
   private profiles: string[] = [];
   private selectedProfile: string = '';
   private tabCounter: number = 0;
+  private draggedTabId: string | null = null;
 
   constructor() {
     this.init();
@@ -27,9 +29,10 @@ class XBrowser {
     // Load saved tabs or create initial tab
     const savedTabs = this.loadSavedTabs();
     if (savedTabs.length > 0) {
-      // Restore saved tabs
-      for (const savedTab of savedTabs) {
-        await this.createTab(savedTab.profile, savedTab.url);
+      // Restore saved tabs in order
+      const sortedTabs = savedTabs.sort((a, b) => (a.order || 0) - (b.order || 0));
+      for (const savedTab of sortedTabs) {
+        await this.createTab(savedTab.profile, savedTab.url, savedTab.order);
       }
     } else if (this.profiles.length > 0) {
       // Create initial tab with first profile if no saved tabs
@@ -81,7 +84,7 @@ class XBrowser {
     });
   }
 
-  async createTab(profile: string, url: string = 'https://twitter.com') {
+  async createTab(profile: string, url: string = 'https://twitter.com', order?: number) {
     const tabId = `tab-${++this.tabCounter}`;
 
     const tab: Tab = {
@@ -90,7 +93,8 @@ class XBrowser {
       url: url,
       profile: profile,
       webview: null,
-      wrapper: null
+      wrapper: null,
+      order: order !== undefined ? order : this.tabs.size
     };
 
     this.tabs.set(tabId, tab);
@@ -109,6 +113,7 @@ class XBrowser {
     const tabHeader = document.createElement('div');
     tabHeader.className = 'tab-header';
     tabHeader.dataset.tabId = tab.id;
+    tabHeader.draggable = true;
 
     const badge = document.createElement('span');
     badge.className = 'tab-profile-badge';
@@ -132,8 +137,15 @@ class XBrowser {
 
     tabHeader.addEventListener('click', () => {
       this.activateTab(tab.id);
-      console.log("clicked", tab.id);
     });
+
+    // Drag and drop event handlers
+    tabHeader.addEventListener('dragstart', (e) => this.handleDragStart(e, tab.id));
+    tabHeader.addEventListener('dragend', (e) => this.handleDragEnd(e));
+
+    wrapper.addEventListener('dragover', (e) => this.handleDragOver(e, tab.id));
+    wrapper.addEventListener('drop', (e) => this.handleDrop(e, tab.id));
+    wrapper.addEventListener('dragleave', (e) => this.handleDragLeave(e));
 
     // Append tab header to wrapper
     wrapper.appendChild(tabHeader);
@@ -277,14 +289,17 @@ class XBrowser {
   }
 
   saveTabs() {
-    const tabsToSave = Array.from(this.tabs.values()).map(tab => ({
-      url: tab.url,
-      profile: tab.profile
-    }));
+    const tabsToSave = Array.from(this.tabs.values())
+      .sort((a, b) => a.order - b.order)
+      .map(tab => ({
+        url: tab.url,
+        profile: tab.profile,
+        order: tab.order
+      }));
     localStorage.setItem('xbrowser-tabs', JSON.stringify(tabsToSave));
   }
 
-  loadSavedTabs(): Array<{ url: string; profile: string }> {
+  loadSavedTabs(): Array<{ url: string; profile: string; order: number }> {
     try {
       const saved = localStorage.getItem('xbrowser-tabs');
       if (saved) {
@@ -398,6 +413,87 @@ class XBrowser {
     } else {
       alert(result.error || 'Failed to delete profile');
     }
+  }
+
+  // Drag and drop handlers
+  handleDragStart(e: DragEvent, tabId: string) {
+    this.draggedTabId = tabId;
+    const tabHeader = e.target as HTMLElement;
+    tabHeader.classList.add('dragging');
+
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/html', tabId);
+    }
+  }
+
+  handleDragEnd(e: DragEvent) {
+    const tabHeader = e.target as HTMLElement;
+    tabHeader.classList.remove('dragging');
+
+    // Remove all drag-over classes
+    document.querySelectorAll('.webview-wrapper').forEach(wrapper => {
+      wrapper.classList.remove('drag-over');
+    });
+
+    this.draggedTabId = null;
+  }
+
+  handleDragOver(e: DragEvent, targetTabId: string) {
+    e.preventDefault();
+
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'move';
+    }
+
+    if (this.draggedTabId && this.draggedTabId !== targetTabId) {
+      const targetWrapper = e.currentTarget as HTMLElement;
+      targetWrapper.classList.add('drag-over');
+    }
+  }
+
+  handleDragLeave(e: DragEvent) {
+    const wrapper = e.currentTarget as HTMLElement;
+    wrapper.classList.remove('drag-over');
+  }
+
+  handleDrop(e: DragEvent, targetTabId: string) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const wrapper = e.currentTarget as HTMLElement;
+    wrapper.classList.remove('drag-over');
+
+    if (this.draggedTabId && this.draggedTabId !== targetTabId) {
+      this.reorderTabs(this.draggedTabId, targetTabId);
+    }
+  }
+
+  reorderTabs(draggedId: string, targetId: string) {
+    const draggedTab = this.tabs.get(draggedId);
+    const targetTab = this.tabs.get(targetId);
+
+    if (!draggedTab || !targetTab || !draggedTab.wrapper || !targetTab.wrapper) return;
+
+    const container = document.getElementById('views-container')!;
+
+    // Move dragged wrapper before target wrapper
+    container.insertBefore(draggedTab.wrapper, targetTab.wrapper);
+
+    // Update order for all tabs based on current DOM position
+    const wrappers = Array.from(container.children);
+    wrappers.forEach((wrapper, index) => {
+      const tabId = (wrapper as HTMLElement).dataset.tabId;
+      if (tabId) {
+        const tab = this.tabs.get(tabId);
+        if (tab) {
+          tab.order = index;
+        }
+      }
+    });
+
+    // Save the new order
+    this.saveTabs();
   }
 }
 

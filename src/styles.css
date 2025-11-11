@@ -80,8 +80,8 @@ body {
   padding: 6px 12px;
   background: #2a2a2a;
   border-bottom: 1px solid #3a3a3a;
-  cursor: pointer;
-  transition: background 0.2s;
+  cursor: move;
+  transition: background 0.2s, opacity 0.2s;
   flex-shrink: 0;
   height: 32px;
 }
@@ -92,6 +92,11 @@ body {
 
 .webview-wrapper.active .tab-header {
   background: #1da1f2;
+}
+
+.tab-header.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
 }
 
 .tab-profile-badge {
@@ -158,11 +163,16 @@ body {
   display: flex;
   flex-direction: column;
   border: 2px solid transparent;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background-color 0.2s;
 }
 
 .webview-wrapper.active {
   border-color: #1da1f2;
+}
+
+.webview-wrapper.drag-over {
+  border-color: #4caf50;
+  background-color: rgba(76, 175, 80, 0.1);
 }
 
 .webview-wrapper webview {
