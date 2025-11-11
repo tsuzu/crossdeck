@@ -143,9 +143,8 @@ body {
 
 /* Views container */
 .views-container {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(400px, 1fr);
+  display: flex;
+  flex-direction: row;
   gap: 1px;
   flex: 1 1 auto;
   overflow-x: auto;
@@ -164,6 +163,7 @@ body {
   flex-direction: column;
   border: 2px solid transparent;
   transition: border-color 0.2s, background-color 0.2s;
+  flex: 1 0 auto;
 }
 
 .webview-wrapper.active {
@@ -320,6 +320,46 @@ body {
 }
 
 .add-profile-section input:focus {
+  outline: none;
+  border-color: #1da1f2;
+}
+
+.settings-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #4a4a4a;
+}
+
+.settings-section h3 {
+  margin: 0 0 15px 0;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.setting-item label {
+  color: #cccccc;
+  font-size: 14px;
+  min-width: 180px;
+}
+
+.setting-item input[type="number"] {
+  padding: 8px 12px;
+  background: #3a3a3a;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 14px;
+  width: 120px;
+}
+
+.setting-item input[type="number"]:focus {
   outline: none;
   border-color: #1da1f2;
 }
