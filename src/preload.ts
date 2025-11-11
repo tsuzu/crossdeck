@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 interface ProfileData {
+  id: string;
   name: string;
   homepage: string;
 }

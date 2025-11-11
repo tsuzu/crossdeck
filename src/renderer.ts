@@ -10,6 +10,7 @@ interface Tab {
 }
 
 interface ProfileData {
+  id: string;
   name: string;
   homepage: string;
 }
