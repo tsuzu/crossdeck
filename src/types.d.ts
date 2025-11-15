@@ -23,6 +23,7 @@ declare global {
       onZoomReset: (callback: () => void) => void;
       onZoomIn: (callback: () => void) => void;
       onZoomOut: (callback: () => void) => void;
+      onReloadTab: (callback: () => void) => void;
     };
   }
 }

@@ -145,8 +145,13 @@ function setupMenuShortcuts() {
     {
       label: 'View',
       submenu: [
-        { role: 'reload' as const },
-        { role: 'forceReload' as const },
+        {
+          label: 'Reload',
+          accelerator: isMac ? 'Cmd+R' : 'Ctrl+R',
+          click: () => {
+            mainWindow?.webContents.send('reload-tab');
+          }
+        },
         { role: 'toggleDevTools' as const },
         { type: 'separator' as const },
         {
