@@ -35,5 +35,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('zoom-out', () => {
       callback();
     });
+  },
+  onReloadTab: (callback: () => void) => {
+    ipcRenderer.on('reload-tab', () => {
+      callback();
+    });
   }
 });

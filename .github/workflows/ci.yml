@@ -32,6 +32,10 @@ jobs:
       - name: Run build
         run: npm run build
 
+      - name: Package app (PR only)
+        if: github.event_name == 'pull_request'
+        run: npm run pack
+
       - name: Verify build artifacts
         run: |
           if [ ! -f dist/main.js ]; then
@@ -47,3 +51,18 @@ jobs:
             exit 1
           fi
         shell: bash
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.os }}-node-22
+          path: dist/
+          retention-days: 7
+
+      - name: Upload packaged app (PR only)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.os }}-node-22
+          path: release/
+          retention-days: 7

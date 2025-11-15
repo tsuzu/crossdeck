@@ -50,6 +50,11 @@ class CrossDeck {
       this.zoomOut();
     });
 
+    // Setup reload listener
+    window.electronAPI.onReloadTab(() => {
+      this.reloadActiveTab();
+    });
+
     // Load saved tabs or create initial tab
     const savedTabs = this.loadSavedTabs();
     if (savedTabs.length > 0) {
@@ -165,6 +170,14 @@ class CrossDeck {
     if (tab && tab.webview) {
       const currentZoom = tab.webview.getZoomLevel();
       tab.webview.setZoomLevel(currentZoom - 0.5);
+    }
+  }
+
+  reloadActiveTab() {
+    if (!this.activeTabId) return;
+    const tab = this.tabs.get(this.activeTabId);
+    if (tab && tab.webview) {
+      tab.webview.reload();
     }
   }
 
