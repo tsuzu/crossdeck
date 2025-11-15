@@ -47,3 +47,10 @@ jobs:
             exit 1
           fi
         shell: bash
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.os }}-node-22
+          path: dist/
+          retention-days: 7
