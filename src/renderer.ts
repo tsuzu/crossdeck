@@ -24,6 +24,7 @@ class CrossDeck {
   private selectedProfile: string = '';
   private tabCounter: number = 0;
   private draggedTabId: string | null = null;
+  private minimumWidth: number = 400; // Default minimum width in pixels
 
   constructor() {
     this.init();
@@ -31,6 +32,7 @@ class CrossDeck {
 
   async init() {
     await this.loadProfiles();
+    this.loadSettings();
     this.setupEventListeners();
     this.updateProfileSelect();
 
@@ -78,6 +80,44 @@ class CrossDeck {
 
   async loadProfiles() {
     this.profiles = await window.electronAPI.getProfiles();
+  }
+
+  loadSettings() {
+    const savedWidth = localStorage.getItem('minimumWidth');
+    if (savedWidth) {
+      const width = parseInt(savedWidth, 10);
+      if (width >= 200 && width <= 2000) { // Validate range
+        this.minimumWidth = width;
+      }
+    }
+  }
+
+  saveSettings() {
+    localStorage.setItem('minimumWidth', this.minimumWidth.toString());
+    // Apply to all existing tabs
+    this.applyMinimumWidthToAllTabs();
+  }
+
+  saveSettingsFromUI() {
+    const widthInput = document.getElementById('minimum-width-input') as HTMLInputElement;
+    const width = parseInt(widthInput.value, 10);
+
+    if (isNaN(width) || width < 200 || width > 2000) {
+      alert('Please enter a valid width between 200 and 2000 pixels');
+      return;
+    }
+
+    this.minimumWidth = width;
+    this.saveSettings();
+    alert('Settings saved! The new minimum width has been applied to all tabs.');
+  }
+
+  applyMinimumWidthToAllTabs() {
+    this.tabs.forEach(tab => {
+      if (tab.wrapper) {
+        tab.wrapper.style.minWidth = `${this.minimumWidth}px`;
+      }
+    });
   }
 
   setupEventListeners() {
@@ -129,6 +169,11 @@ class CrossDeck {
       if (e.key === 'Enter') {
         this.addProfile();
       }
+    });
+
+    // Save settings button
+    document.getElementById('save-settings-btn')!.addEventListener('click', () => {
+      this.saveSettingsFromUI();
     });
   }
 
@@ -306,6 +351,7 @@ class CrossDeck {
     const wrapper = document.createElement('div');
     wrapper.className = 'webview-wrapper';
     wrapper.dataset.tabId = tab.id;
+    wrapper.style.minWidth = `${this.minimumWidth}px`;
 
     // Create tab header
     const tabHeader = document.createElement('div');
@@ -582,6 +628,9 @@ class CrossDeck {
 
   openProfileModal() {
     this.updateProfileList();
+    // Update settings input with current value
+    const widthInput = document.getElementById('minimum-width-input') as HTMLInputElement;
+    widthInput.value = this.minimumWidth.toString();
     document.getElementById('profile-modal')!.style.display = 'flex';
   }
 
