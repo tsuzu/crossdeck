@@ -24,6 +24,8 @@ class CrossDeck {
   private selectedProfile: string = '';
   private tabCounter: number = 0;
   private draggedTabId: string | null = null;
+  private isColumnFullscreen: boolean = false;
+  private fullscreenTabId: string | null = null;
 
   constructor() {
     this.init();
@@ -53,6 +55,11 @@ class CrossDeck {
     // Setup reload listener
     window.electronAPI.onReloadTab(() => {
       this.reloadActiveTab();
+    });
+
+    // Setup column fullscreen toggle listener
+    window.electronAPI.onToggleColumnFullscreen(() => {
+      this.toggleColumnFullscreen();
     });
 
     // Load saved tabs or create initial tab
@@ -178,6 +185,42 @@ class CrossDeck {
     const tab = this.tabs.get(this.activeTabId);
     if (tab && tab.webview) {
       tab.webview.reload();
+    }
+  }
+
+  toggleColumnFullscreen() {
+    if (!this.activeTabId) return;
+
+    if (this.isColumnFullscreen && this.fullscreenTabId === this.activeTabId) {
+      this.isColumnFullscreen = false;
+      this.fullscreenTabId = null;
+    } else {
+      this.isColumnFullscreen = true;
+      this.fullscreenTabId = this.activeTabId;
+    }
+
+    this.updateColumnFullscreen();
+  }
+
+  updateColumnFullscreen() {
+    const container = document.getElementById('views-container');
+    if (!container) return;
+
+    if (this.isColumnFullscreen && this.fullscreenTabId) {
+      container.classList.add('column-fullscreen');
+      this.tabs.forEach(tab => {
+        if (!tab.wrapper) return;
+        if (tab.id === this.fullscreenTabId) {
+          tab.wrapper.classList.remove('column-hidden');
+        } else {
+          tab.wrapper.classList.add('column-hidden');
+        }
+      });
+    } else {
+      container.classList.remove('column-fullscreen');
+      this.tabs.forEach(tab => {
+        tab.wrapper?.classList.remove('column-hidden');
+      });
     }
   }
 
@@ -494,6 +537,11 @@ class CrossDeck {
       });
     }
 
+    if (this.isColumnFullscreen && this.activeTabId) {
+      this.fullscreenTabId = this.activeTabId;
+      this.updateColumnFullscreen();
+    }
+
     // Focus the active webview
     if (tab.webview) {
       tab.webview.focus();
@@ -533,6 +581,12 @@ class CrossDeck {
       } else {
         this.activeTabId = null;
       }
+    }
+
+    if (this.tabs.size === 0) {
+      this.isColumnFullscreen = false;
+      this.fullscreenTabId = null;
+      this.updateColumnFullscreen();
     }
 
     // Save tabs after closing

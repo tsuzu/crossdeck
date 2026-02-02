@@ -187,6 +187,16 @@ body {
   min-height: 0;
 }
 
+.views-container.column-fullscreen {
+  grid-auto-columns: 100%;
+  gap: 0;
+  overflow: hidden;
+}
+
+.views-container.column-fullscreen .webview-wrapper {
+  min-width: 0;
+}
+
 .webview-wrapper {
   position: relative;
   background: #1a1a1a;
@@ -197,6 +207,10 @@ body {
   flex-direction: column;
   border: 2px solid transparent;
   transition: border-color 0.2s, background-color 0.2s;
+}
+
+.webview-wrapper.column-hidden {
+  display: none;
 }
 
 .webview-wrapper.active {
