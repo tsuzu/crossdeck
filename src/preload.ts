@@ -40,5 +40,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('reload-tab', () => {
       callback();
     });
+  },
+  onToggleColumnFullscreen: (callback: () => void) => {
+    ipcRenderer.on('toggle-column-fullscreen', () => {
+      callback();
+    });
   }
 });

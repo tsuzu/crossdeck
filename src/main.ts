@@ -176,6 +176,13 @@ function setupMenuShortcuts() {
           }
         },
         { type: 'separator' as const },
+        {
+          label: 'Toggle Column Fullscreen',
+          accelerator: isMac ? 'Cmd+G' : 'Ctrl+G',
+          click: () => {
+            mainWindow?.webContents.send('toggle-column-fullscreen');
+          }
+        },
         { role: 'togglefullscreen' as const },
         { type: 'separator' as const },
         // Add custom tab shortcuts (hidden but active)
