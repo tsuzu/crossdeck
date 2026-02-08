@@ -45,5 +45,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('toggle-column-fullscreen', () => {
       callback();
     });
+  },
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  onUpdateStatus: (callback: (status: any) => void) => {
+    ipcRenderer.on('update-status', (_event, status) => callback(status));
+  },
+  onMenuCheckForUpdates: (callback: () => void) => {
+    ipcRenderer.on('menu-check-for-updates', () => callback());
   }
 });

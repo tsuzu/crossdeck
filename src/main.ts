@@ -2,6 +2,16 @@ import { app, BrowserWindow, session, ipcMain, Session, Menu, shell } from 'elec
 import * as path from 'path';
 import * as fs from 'fs';
 import { randomUUID } from 'crypto';
+import { autoUpdater } from 'electron-updater';
+
+// Configure AutoUpdater - only check for updates, no automatic download/install
+// Users will be directed to GitHub to manually download the update
+autoUpdater.autoDownload = false;
+
+// Disable update checks in development mode
+if (process.argv.includes('--dev')) {
+  autoUpdater.updateConfigPath = null;
+}
 
 interface ProfileData {
   id: string;
@@ -91,6 +101,24 @@ function createWindow() {
     callback(false);
   });
 
+  // Prevent main window from navigating (keep it on index.html)
+  // This serves as a fallback for links that might not be handled by renderer process
+  // (e.g., modal links in update notifications are already handled in renderer.ts)
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    // Allow navigation to the initial page
+    if (mainWindow && (url.includes('index.html') || url === mainWindow.webContents.getURL())) {
+      return;
+    }
+    event.preventDefault();
+    shell.openExternal(url);
+  });
+
+  // Handle attempts to open new windows - always open in external browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
   // Handle webview permission requests - deny all
   mainWindow.webContents.on('did-attach-webview', (event, webviewWebContents) => {
     webviewWebContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
@@ -124,6 +152,13 @@ function setupMenuShortcuts() {
       label: 'crossdeck',
       submenu: [
         { role: 'about' as const },
+        { type: 'separator' as const },
+        {
+          label: 'Check for Updates...',
+          click: () => {
+            mainWindow?.webContents.send('menu-check-for-updates');
+          }
+        },
         { type: 'separator' as const },
         { role: 'services' as const },
         { type: 'separator' as const },
@@ -184,6 +219,13 @@ function setupMenuShortcuts() {
           }
         },
         { role: 'togglefullscreen' as const },
+        { type: 'separator' as const },
+        {
+          label: 'Check for Updates...',
+          click: () => {
+            mainWindow?.webContents.send('menu-check-for-updates');
+          }
+        },
         { type: 'separator' as const },
         // Add custom tab shortcuts (hidden but active)
         ...Array.from({ length: 9 }, (_, i) => i + 1).map(i => ({
@@ -378,12 +420,84 @@ ipcMain.handle('open-external', async (event, url: string) => {
   await shell.openExternal(url);
 });
 
+// Update-related IPC handlers
+ipcMain.handle('check-for-updates', async () => {
+  if (process.argv.includes('--dev')) {
+    return { success: false, error: 'Updates disabled in development mode' };
+  }
+  try {
+    await autoUpdater.checkForUpdates();
+    return { success: true };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
+// Setup AutoUpdater event handlers
+function setupAutoUpdater() {
+  autoUpdater.on('checking-for-update', () => {
+    mainWindow?.webContents.send('update-status', {
+      type: 'checking',
+      message: 'Checking for updates...'
+    });
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    mainWindow?.webContents.send('update-status', {
+      type: 'available',
+      message: `Version ${info.version} is available`,
+      version: info.version,
+      releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : ''
+    });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    mainWindow?.webContents.send('update-status', {
+      type: 'not-available',
+      message: 'You are up to date'
+    });
+  });
+
+  autoUpdater.on('error', (err) => {
+    mainWindow?.webContents.send('update-status', {
+      type: 'error',
+      message: 'Update check failed',
+      error: err.message
+    });
+  });
+}
+
 // Set application name
 app.setName('crossdeck');
+
+// Set About panel options for macOS
+if (process.platform === 'darwin') {
+  app.setAboutPanelOptions({
+    applicationName: 'crossdeck',
+    applicationVersion: app.getVersion(),
+    version: app.getVersion(),
+    copyright: 'MIT License'
+  });
+}
 
 app.whenReady().then(() => {
   initializeProfiles();
   createWindow();
+  setupAutoUpdater();
+
+  // Auto-check for updates after 5 seconds (only in production)
+  if (!process.argv.includes('--dev')) {
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch(() => {
+        // Silently fail - user can check manually
+      });
+    }, 5000);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

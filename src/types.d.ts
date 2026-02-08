@@ -7,6 +7,14 @@ interface ProfileData {
   homepage: string;
 }
 
+interface UpdateStatus {
+  type: 'checking' | 'available' | 'not-available' | 'error';
+  message: string;
+  version?: string;
+  releaseNotes?: string;
+  error?: string;
+}
+
 declare global {
   interface Window {
     electronAPI: {
@@ -25,6 +33,10 @@ declare global {
       onZoomOut: (callback: () => void) => void;
       onReloadTab: (callback: () => void) => void;
       onToggleColumnFullscreen: (callback: () => void) => void;
+      checkForUpdates: () => Promise<{ success: boolean; error?: string }>;
+      getAppVersion: () => Promise<string>;
+      onUpdateStatus: (callback: (status: UpdateStatus) => void) => void;
+      onMenuCheckForUpdates: (callback: () => void) => void;
     };
   }
 }
