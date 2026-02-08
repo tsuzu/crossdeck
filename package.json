@@ -23,6 +23,8 @@
     "productName": "crossdeck",
     "publish": {
       "provider": "github",
+      "owner": "tsuzu",
+      "repo": "crossdeck",
       "releaseType": "release"
     },
     "mac": {
@@ -62,5 +64,8 @@
     "electron": "^28.0.0",
     "electron-builder": "^24.13.3",
     "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.7.3"
   }
 }

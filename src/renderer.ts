@@ -17,6 +17,312 @@ interface ProfileData {
   homepage: string;
 }
 
+interface UpdateStatus {
+  type: 'checking' | 'available' | 'not-available' | 'error';
+  message: string;
+  version?: string;
+  releaseNotes?: string;
+  error?: string;
+}
+
+// Update Manager class
+class UpdateManager {
+  private indicator: HTMLDivElement | null = null;
+  private modal: HTMLDivElement | null = null;
+  private currentUpdateInfo: { version: string; releaseNotes: string } | null = null;
+  private indicatorTimeout: number | null = null;
+  private isManualCheck: boolean = false;
+
+  constructor() {
+    this.init();
+  }
+
+  private init() {
+    this.createUpdateIndicator();
+    this.createUpdateModal();
+    this.setupEventListeners();
+  }
+
+  private createUpdateIndicator() {
+    this.indicator = document.createElement('div');
+    this.indicator.id = 'update-indicator';
+    this.indicator.className = 'update-indicator';
+    this.indicator.style.display = 'none';
+
+    const toolbarRight = document.querySelector('.toolbar-right');
+    if (toolbarRight) {
+      toolbarRight.insertBefore(this.indicator, toolbarRight.firstChild);
+    }
+  }
+
+  private createUpdateModal() {
+    this.modal = document.createElement('div');
+    this.modal.id = 'update-modal';
+    this.modal.className = 'modal';
+    this.modal.style.display = 'none';
+
+    this.modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Update Available</h2>
+          <button class="modal-close" id="update-modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <div id="update-modal-body-content"></div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(this.modal);
+
+    document.getElementById('update-modal-close')?.addEventListener('click', () => {
+      this.hideUpdateModal();
+    });
+
+    this.modal.addEventListener('click', (e) => {
+      if (e.target === this.modal) {
+        this.hideUpdateModal();
+      }
+    });
+  }
+
+  private setupEventListeners() {
+    window.electronAPI.onUpdateStatus((status) => {
+      this.handleUpdateStatus(status);
+    });
+
+    window.electronAPI.onMenuCheckForUpdates(() => {
+      this.checkForUpdates();
+    });
+  }
+
+  private handleUpdateStatus(status: UpdateStatus) {
+    switch (status.type) {
+      case 'checking':
+        // Don't show any indicator during automatic checks
+        // Manual checks already show a modal dialog
+        break;
+
+      case 'available':
+        if (status.version && status.releaseNotes !== undefined) {
+          this.currentUpdateInfo = {
+            version: status.version,
+            releaseNotes: status.releaseNotes
+          };
+          this.showIndicator(
+            `v${status.version} available`,
+            'info',
+            'Details',
+            () => this.showUpdateModal()
+          );
+
+          // Show modal immediately if it's a manual check
+          if (this.isManualCheck) {
+            this.showUpdateModal();
+            this.isManualCheck = false;
+          }
+        }
+        break;
+
+      case 'not-available':
+        if (this.isManualCheck) {
+          this.showNoUpdateDialog();
+          this.isManualCheck = false;
+        }
+        break;
+
+      case 'error':
+        const errorMsg = status.error || 'Update check failed';
+        // Ignore signature verification errors since we're not auto-installing
+        if (errorMsg.includes('code signature') || errorMsg.includes('did not pass validation')) {
+          break;
+        }
+        this.showIndicator(errorMsg, 'error');
+        setTimeout(() => this.hideIndicator(), 5000);
+        this.isManualCheck = false;
+        break;
+    }
+  }
+
+  private showIndicator(
+    text: string,
+    type: 'info' | 'success' | 'error',
+    actionText?: string,
+    actionCallback?: () => void
+  ) {
+    if (!this.indicator) return;
+
+    if (this.indicatorTimeout) {
+      clearTimeout(this.indicatorTimeout);
+      this.indicatorTimeout = null;
+    }
+
+    this.indicator.className = `update-indicator update-indicator-${type}`;
+    this.indicator.innerHTML = `
+      <span class="update-text">${text}</span>
+      ${actionText ? `<button class="update-action-btn">${actionText}</button>` : ''}
+    `;
+
+    if (actionText && actionCallback) {
+      const btn = this.indicator.querySelector('.update-action-btn');
+      btn?.addEventListener('click', actionCallback);
+    }
+
+    this.indicator.style.display = 'flex';
+  }
+
+  private hideIndicator() {
+    if (this.indicator) {
+      this.indicator.style.display = 'none';
+    }
+  }
+
+  private showUpdateModal() {
+    if (!this.modal || !this.currentUpdateInfo) return;
+
+    const content = document.getElementById('update-modal-body-content');
+    if (!content) return;
+
+    const releaseUrl = `https://github.com/tsuzu/crossdeck/releases/tag/v${this.currentUpdateInfo.version}`;
+
+    content.innerHTML = `
+      <div class="update-version">
+        <strong>Version ${this.currentUpdateInfo.version} is available</strong>
+      </div>
+      <div class="release-notes">
+        <h3>Release Notes:</h3>
+        <div>${this.currentUpdateInfo.releaseNotes || 'No release notes available.'}</div>
+      </div>
+      <div class="update-actions">
+        <button class="btn btn-primary" id="open-release-page-btn">Download from GitHub</button>
+        <button class="btn" id="cancel-update-btn">Later</button>
+      </div>
+    `;
+
+    document.getElementById('open-release-page-btn')?.addEventListener('click', async () => {
+      await window.electronAPI.openExternal(releaseUrl);
+      this.hideUpdateModal();
+    });
+
+    document.getElementById('cancel-update-btn')?.addEventListener('click', () => {
+      this.hideUpdateModal();
+    });
+
+    this.modal.style.display = 'flex';
+  }
+
+  private hideUpdateModal() {
+    if (this.modal) {
+      this.modal.style.display = 'none';
+    }
+  }
+
+  private showCheckingDialog() {
+    if (!this.modal) return;
+
+    const content = document.getElementById('update-modal-body-content');
+    if (!content) return;
+
+    // Update modal header
+    const modalHeader = this.modal.querySelector('.modal-header h2');
+    if (modalHeader) {
+      modalHeader.textContent = 'Checking for Updates';
+    }
+
+    content.innerHTML = `
+      <div class="update-version" style="text-align: center; padding: 40px 20px;">
+        <div class="loading-spinner" style="margin: 0 auto 20px; width: 40px; height: 40px; border: 4px solid #3a3a3a; border-top: 4px solid #1da1f2; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <p style="font-size: 16px; color: #888;">Checking for updates...</p>
+        <p style="font-size: 14px; color: #666; margin-top: 8px;">This may take a few moments</p>
+      </div>
+    `;
+
+    this.modal.style.display = 'flex';
+  }
+
+  private async showNoUpdateDialog() {
+    if (!this.modal) return;
+
+    const currentVersion = await window.electronAPI.getAppVersion();
+    const content = document.getElementById('update-modal-body-content');
+    if (!content) return;
+
+    // Update modal header
+    const modalHeader = this.modal.querySelector('.modal-header h2');
+    if (modalHeader) {
+      modalHeader.textContent = 'No Updates Available';
+    }
+
+    content.innerHTML = `
+      <div class="update-version" style="text-align: center; padding: 30px 20px;">
+        <p style="font-size: 16px; margin-bottom: 8px;">You're using the latest version.</p>
+        <p style="font-size: 16px; margin-bottom: 16px;">No updates available.</p>
+        <p style="font-size: 14px; color: #888;">Version ${currentVersion}</p>
+      </div>
+      <div class="update-actions" style="justify-content: center;">
+        <button class="btn btn-primary" id="ok-no-update-btn">OK</button>
+      </div>
+    `;
+
+    document.getElementById('ok-no-update-btn')?.addEventListener('click', () => {
+      this.hideUpdateModal();
+      // Restore modal header text
+      const modalHeader = this.modal?.querySelector('.modal-header h2');
+      if (modalHeader) {
+        modalHeader.textContent = 'Update Available';
+      }
+    });
+
+    this.modal.style.display = 'flex';
+  }
+
+  private async showErrorDialog(error: string) {
+    if (!this.modal) return;
+
+    const currentVersion = await window.electronAPI.getAppVersion();
+    const content = document.getElementById('update-modal-body-content');
+    if (!content) return;
+
+    // Update modal header
+    const modalHeader = this.modal.querySelector('.modal-header h2');
+    if (modalHeader) {
+      modalHeader.textContent = 'Update Check Failed';
+    }
+
+    content.innerHTML = `
+      <div class="update-version" style="text-align: center; padding: 20px 0;">
+        <p style="font-size: 16px; margin-bottom: 12px; color: #e74c3c;">${error}</p>
+        <p style="font-size: 14px; color: #888; margin-top: 12px;">Current version: ${currentVersion}</p>
+      </div>
+      <div class="update-actions" style="justify-content: center;">
+        <button class="btn btn-primary" id="ok-error-btn">OK</button>
+      </div>
+    `;
+
+    document.getElementById('ok-error-btn')?.addEventListener('click', () => {
+      this.hideUpdateModal();
+      // Restore modal header text
+      const modalHeader = this.modal?.querySelector('.modal-header h2');
+      if (modalHeader) {
+        modalHeader.textContent = 'Update Available';
+      }
+    });
+
+    this.modal.style.display = 'flex';
+  }
+
+  private async checkForUpdates() {
+    this.isManualCheck = true;
+    this.showCheckingDialog();
+
+    const result = await window.electronAPI.checkForUpdates();
+    if (!result.success && result.error) {
+      this.isManualCheck = false;
+      this.showErrorDialog(result.error);
+    }
+  }
+}
+
 class CrossDeck {
   private tabs: Map<string, Tab> = new Map();
   private activeTabId: string | null = null;
@@ -32,6 +338,7 @@ class CrossDeck {
   }
 
   async init() {
+    new UpdateManager();
     await this.loadProfiles();
     this.setupEventListeners();
     this.updateProfileSelect();
