@@ -461,8 +461,10 @@ class CrossDeck {
     const webview = document.createElement('webview') as Electron.WebviewTag;
     const partition = await window.electronAPI.getPartition(tab.profile);
 
-    webview.setAttribute('src', tab.url);
+    // Electron requires partition to be set before the initial src load,
+    // otherwise the webview can fall back to the default session.
     webview.setAttribute('partition', partition);
+    webview.setAttribute('src', tab.url);
     webview.setAttribute('allowpopups', 'true');
     webview.dataset.tabId = tab.id;
 
