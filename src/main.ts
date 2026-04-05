@@ -2,7 +2,7 @@ import { app, BrowserWindow, session, ipcMain, Session, Menu, shell } from 'elec
 import * as path from 'path';
 import * as fs from 'fs';
 import { randomUUID } from 'crypto';
-import { CosmeticFilter, ElectronBlocker } from '@ghostery/adblocker-electron';
+import { ElectronBlocker } from '@ghostery/adblocker-electron';
 
 interface ProfileData {
   id: string;
@@ -13,14 +13,6 @@ interface ProfileData {
 let mainWindow: BrowserWindow | null = null;
 const profiles: Map<string, { id: string; session: Session; homepage: string }> = new Map();
 let adBlockerPromise: Promise<ElectronBlocker> | null = null;
-let customFiltersInstalled = false;
-
-const customCosmeticFilterLines = [
-  'x.com##[data-testid="placementTracking"]',
-  'twitter.com##[data-testid="placementTracking"]',
-  'x.com##[aria-label="Promoted"]',
-  'twitter.com##[aria-label="Promoted"]'
-];
 
 function getProfilesFilePath(): string {
   return path.join(app.getPath('userData'), 'profiles.json');
@@ -225,17 +217,11 @@ function setupSessionPermissions(profileSession: Session) {
 function getAdBlocker(): Promise<ElectronBlocker> {
   if (!adBlockerPromise) {
     adBlockerPromise = ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then(blocker => {
-      if (!customFiltersInstalled) {
-        const customFilters = customCosmeticFilterLines
-          .map(line => CosmeticFilter.parse(line))
-          .filter((filter): filter is NonNullable<typeof filter> => filter !== null);
-
-        if (customFilters.length > 0) {
-          blocker.update({ newCosmeticFilters: customFilters });
-          customFiltersInstalled = true;
-        }
-      }
-
+      // Ghostery's Electron cosmetic filter integration registers a global IPC
+      // handler, so it cannot be enabled for multiple sessions in this app.
+      // Keep the network/request blocking and use our own X-specific DOM cleanup
+      // in the renderer instead.
+      (blocker.config as any).loadCosmeticFilters = false;
       return blocker;
     });
   }
