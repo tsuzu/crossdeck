@@ -2,7 +2,7 @@ import { app, BrowserWindow, session, ipcMain, Session, Menu, shell } from 'elec
 import * as path from 'path';
 import * as fs from 'fs';
 import { randomUUID } from 'crypto';
-import { ElectronBlocker } from '@ghostery/adblocker-electron';
+import { CosmeticFilter, ElectronBlocker } from '@ghostery/adblocker-electron';
 
 interface ProfileData {
   id: string;
@@ -13,6 +13,14 @@ interface ProfileData {
 let mainWindow: BrowserWindow | null = null;
 const profiles: Map<string, { id: string; session: Session; homepage: string }> = new Map();
 let adBlockerPromise: Promise<ElectronBlocker> | null = null;
+let customFiltersInstalled = false;
+
+const customCosmeticFilterLines = [
+  'x.com##[data-testid="placementTracking"]',
+  'twitter.com##[data-testid="placementTracking"]',
+  'x.com##[aria-label="Promoted"]',
+  'twitter.com##[aria-label="Promoted"]'
+];
 
 function getProfilesFilePath(): string {
   return path.join(app.getPath('userData'), 'profiles.json');
@@ -216,7 +224,20 @@ function setupSessionPermissions(profileSession: Session) {
 
 function getAdBlocker(): Promise<ElectronBlocker> {
   if (!adBlockerPromise) {
-    adBlockerPromise = ElectronBlocker.fromPrebuiltAdsAndTracking(fetch);
+    adBlockerPromise = ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then(blocker => {
+      if (!customFiltersInstalled) {
+        const customFilters = customCosmeticFilterLines
+          .map(line => CosmeticFilter.parse(line))
+          .filter((filter): filter is NonNullable<typeof filter> => filter !== null);
+
+        if (customFilters.length > 0) {
+          blocker.update({ newCosmeticFilters: customFilters });
+          customFiltersInstalled = true;
+        }
+      }
+
+      return blocker;
+    });
   }
 
   return adBlockerPromise;

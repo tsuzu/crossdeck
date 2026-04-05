@@ -278,6 +278,59 @@ class CrossDeck {
     }, 15000); // 15 seconds
   }
 
+  getXCleanupScript(): string {
+    return `
+      (() => {
+        const isXHost = location.hostname.includes('x.com') || location.hostname.includes('twitter.com');
+        if (!isXHost) return;
+
+        const hideElement = (element) => {
+          if (!element) return;
+          const target = element.closest('article, [data-testid="cellInnerDiv"], [data-testid="placementTracking"]') || element;
+          if (target instanceof HTMLElement) {
+            target.style.setProperty('display', 'none', 'important');
+          }
+        };
+
+        const hidePromotedContent = () => {
+          document.querySelectorAll('[data-testid="placementTracking"], [aria-label="Promoted"]').forEach(hideElement);
+
+          document.querySelectorAll('article').forEach(article => {
+            const socialContext = article.querySelector('[data-testid="socialContext"]');
+            if (socialContext && /promoted/i.test(socialContext.textContent || '')) {
+              article.style.setProperty('display', 'none', 'important');
+              return;
+            }
+
+            const text = (article.textContent || '').trim();
+            if (/^Promoted$/i.test(text) || /\\bPromoted post\\b/i.test(text)) {
+              article.style.setProperty('display', 'none', 'important');
+            }
+          });
+        };
+
+        let scheduled = false;
+        const scheduleCleanup = () => {
+          if (scheduled) return;
+          scheduled = true;
+          requestAnimationFrame(() => {
+            scheduled = false;
+            hidePromotedContent();
+          });
+        };
+
+        hidePromotedContent();
+
+        const observer = new MutationObserver(scheduleCleanup);
+        observer.observe(document.documentElement, {
+          childList: true,
+          subtree: true,
+          characterData: true
+        });
+      })();
+    `;
+  }
+
   clearAutoReload(tab: Tab) {
     if (tab.autoReloadIntervalId) {
       clearInterval(tab.autoReloadIntervalId);
@@ -472,7 +525,12 @@ class CrossDeck {
           main {
             margin-top: 0 !important;
           }
-          /* Hide Ads */
+          /* Hide obvious X ad markers immediately */
+          [data-testid="placementTracking"],
+          [aria-label="Promoted"] {
+            display: none !important;
+          }
+          /* Hide the ad wrapper used in some timeline placements */
           div[data-testid=cellInnerDiv]:has(path[d="M19.498 3h-15c-1.381 0-2.5 1.12-2.5 2.5v13c0 1.38 1.119 2.5 2.5 2.5h15c1.381 0 2.5-1.12 2.5-2.5v-13c0-1.38-1.119-2.5-2.5-2.5zm-3.502 12h-2v-3.59l-5.293 5.3-1.414-1.42L12.581 10H8.996V8h7v7z"]) {
             display: none;
           }
@@ -489,6 +547,10 @@ class CrossDeck {
         observer.observe(document.body, { childList: true, subtree: true });
       `).catch((err: Error) => {
         console.error('Failed to inject custom scripts:', err);
+      });
+
+      webview.executeJavaScript(this.getXCleanupScript()).catch((err: Error) => {
+        console.error('Failed to inject X cleanup script:', err);
       });
 
       // Setup auto-reload after DOM is ready
