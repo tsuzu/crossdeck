@@ -2,8 +2,6 @@ import { app, BrowserWindow, session, ipcMain, Session, Menu, shell } from 'elec
 import * as path from 'path';
 import * as fs from 'fs';
 import { randomUUID } from 'crypto';
-import { ElectronBlocker } from '@ghostery/adblocker-electron';
-
 interface ProfileData {
   id: string;
   name: string;
@@ -12,8 +10,6 @@ interface ProfileData {
 
 let mainWindow: BrowserWindow | null = null;
 const profiles: Map<string, { id: string; session: Session; homepage: string }> = new Map();
-let adBlockerPromise: Promise<ElectronBlocker> | null = null;
-
 function getProfilesFilePath(): string {
   return path.join(app.getPath('userData'), 'profiles.json');
 }
@@ -214,40 +210,14 @@ function setupSessionPermissions(profileSession: Session) {
   });
 }
 
-function getAdBlocker(): Promise<ElectronBlocker> {
-  if (!adBlockerPromise) {
-    adBlockerPromise = ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then(blocker => {
-      // Ghostery's Electron cosmetic filter integration registers a global IPC
-      // handler, so it cannot be enabled for multiple sessions in this app.
-      // Keep the network/request blocking and use our own X-specific DOM cleanup
-      // in the renderer instead.
-      (blocker.config as any).loadCosmeticFilters = false;
-      return blocker;
-    });
-  }
-
-  return adBlockerPromise;
-}
-
-async function setupAdBlocking(profileSession: Session) {
-  try {
-    const blocker = await getAdBlocker();
-    blocker.enableBlockingInSession(profileSession);
-  } catch (err) {
-    console.error('Failed to enable ad blocking for session:', err);
-  }
-}
-
 // Initialize profiles from saved file
-async function initializeProfiles() {
-  const blocker = await getAdBlocker();
+function initializeProfiles() {
   const savedProfiles = loadProfilesFromFile();
 
   savedProfiles.forEach(profile => {
     const partition = `persist:${profile.id}`;
     const profileSession = session.fromPartition(partition);
     setupSessionPermissions(profileSession);
-    blocker.enableBlockingInSession(profileSession);
     profiles.set(profile.name, {
       id: profile.id,
       session: profileSession,
@@ -277,17 +247,15 @@ ipcMain.handle('create-profile', (event, profileName: string, homepage: string) 
   const partition = `persist:${profileId}`;
   const profileSession = session.fromPartition(partition);
   setupSessionPermissions(profileSession);
-  return setupAdBlocking(profileSession).then(() => {
-    profiles.set(profileName, {
-      id: profileId,
-      session: profileSession,
-      homepage: homepage || 'https://x.com'
-    });
-
-    saveProfilesToFile();
-
-    return { success: true };
+  profiles.set(profileName, {
+    id: profileId,
+    session: profileSession,
+    homepage: homepage || 'https://x.com'
   });
+
+  saveProfilesToFile();
+
+  return { success: true };
 });
 
 ipcMain.handle('delete-profile', async (event, profileName: string) => {
@@ -412,14 +380,8 @@ ipcMain.handle('open-external', async (event, url: string) => {
 app.setName('crossdeck');
 
 app.whenReady().then(() => {
-  initializeProfiles()
-    .then(() => {
-      createWindow();
-    })
-    .catch((err) => {
-      console.error('Failed to initialize profiles:', err);
-      createWindow();
-    });
+  initializeProfiles();
+  createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
