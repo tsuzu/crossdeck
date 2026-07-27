@@ -45,5 +45,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('toggle-column-fullscreen', () => {
       callback();
     });
+  },
+  onToggleSidebar: (callback: () => void) => {
+    ipcRenderer.on('toggle-sidebar', () => {
+      callback();
+    });
+  },
+  onNavigateBack: (callback: () => void) => {
+    ipcRenderer.on('navigate-back', () => {
+      callback();
+    });
+  },
+  onNavigateForward: (callback: () => void) => {
+    ipcRenderer.on('navigate-forward', () => {
+      callback();
+    });
   }
 });

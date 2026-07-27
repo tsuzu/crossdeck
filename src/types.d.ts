@@ -25,6 +25,9 @@ declare global {
       onZoomOut: (callback: () => void) => void;
       onReloadTab: (callback: () => void) => void;
       onToggleColumnFullscreen: (callback: () => void) => void;
+      onToggleSidebar: (callback: () => void) => void;
+      onNavigateBack: (callback: () => void) => void;
+      onNavigateForward: (callback: () => void) => void;
     };
   }
 }
