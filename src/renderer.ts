@@ -62,6 +62,18 @@ class CrossDeck {
       this.toggleColumnFullscreen();
     });
 
+    window.electronAPI.onToggleSidebar(() => {
+      this.toggleSidebar();
+    });
+
+    window.electronAPI.onNavigateBack(() => {
+      this.navigateBack();
+    });
+
+    window.electronAPI.onNavigateForward(() => {
+      this.navigateForward();
+    });
+
     // Load saved tabs or create initial tab
     const savedTabs = this.loadSavedTabs();
     if (savedTabs.length > 0) {
@@ -188,6 +200,31 @@ class CrossDeck {
     }
   }
 
+  navigateBack() {
+    if (!this.activeTabId) return;
+    const tab = this.tabs.get(this.activeTabId);
+    if (tab && tab.webview) {
+      tab.webview.goBack();
+    }
+  }
+
+  navigateForward() {
+    if (!this.activeTabId) return;
+    const tab = this.tabs.get(this.activeTabId);
+    if (tab && tab.webview) {
+      tab.webview.goForward();
+    }
+  }
+
+  toggleSidebar() {
+    if (!this.activeTabId) return;
+    const tab = this.tabs.get(this.activeTabId);
+    if (!tab?.webview) return;
+    tab.webview.executeJavaScript(
+      `document.documentElement.classList.toggle('crossdeck-hide-sidebar'); void 0;`
+    ).catch(() => {});
+  }
+
   toggleColumnFullscreen() {
     if (!this.activeTabId) return;
 
@@ -286,24 +323,37 @@ class CrossDeck {
 
         const hideElement = (element) => {
           if (!element) return;
-          const target = element.closest('article, [data-testid="cellInnerDiv"], [data-testid="placementTracking"]') || element;
+          const target = element.closest('article, [data-testid="cellInnerDiv"]') || element;
           if (target instanceof HTMLElement) {
             target.style.setProperty('display', 'none', 'important');
           }
         };
 
         const hidePromotedContent = () => {
-          document.querySelectorAll('[data-testid="placementTracking"], [aria-label="Promoted"]').forEach(hideElement);
+          const promotedPattern = /\\bpromoted\\b|\\bpromoted post\\b|プロモーション|広告/i;
+
+          document.querySelectorAll('[aria-label]').forEach(element => {
+            if (promotedPattern.test(element.getAttribute('aria-label') || '')) {
+              hideElement(element);
+            }
+          });
+
+          document.querySelectorAll('[data-testid="placementTracking"]').forEach(element => {
+            if (element.closest('[data-testid="tweetPhoto"], [data-testid="videoPlayer"], [data-testid="videoComponent"]')) {
+              return;
+            }
+            hideElement(element);
+          });
 
           document.querySelectorAll('article').forEach(article => {
             const socialContext = article.querySelector('[data-testid="socialContext"]');
-            if (socialContext && /promoted/i.test(socialContext.textContent || '')) {
+            if (socialContext && promotedPattern.test(socialContext.textContent || '')) {
               article.style.setProperty('display', 'none', 'important');
               return;
             }
 
             const text = (article.textContent || '').trim();
-            if (/^Promoted$/i.test(text) || /\\bPromoted post\\b/i.test(text)) {
+            if (promotedPattern.test(text)) {
               article.style.setProperty('display', 'none', 'important');
             }
           });
@@ -499,6 +549,17 @@ class CrossDeck {
     // Disable WebAuthn API to prevent infinite loading
     webview.addEventListener('dom-ready', () => {
       webview.executeJavaScript(`
+        // Prevent embedded pages from keeping the display awake.
+        if ('wakeLock' in navigator) {
+          Object.defineProperty(navigator, 'wakeLock', {
+            value: {
+              request: () => Promise.reject(new DOMException('Wake Lock disabled by crossdeck', 'NotAllowedError'))
+            },
+            writable: false,
+            configurable: false
+          });
+        }
+
         // Override navigator.credentials to immediately reject
         if (navigator.credentials) {
           Object.defineProperty(navigator, 'credentials', {
@@ -517,36 +578,32 @@ class CrossDeck {
           window.PublicKeyCredential = undefined;
         }
 
-        // Hide the Twitter/X header
-        const style = document.createElement('style');
-        style.textContent = \`
-          header[role="banner"] {
+        // Inject sidebar toggle style once; class on <html> controls visibility
+        if (!document.getElementById('crossdeck-sidebar-style')) {
+          const sidebarStyle = document.createElement('style');
+          sidebarStyle.id = 'crossdeck-sidebar-style';
+          sidebarStyle.textContent = \`
+            html.crossdeck-hide-sidebar header[role="banner"] { display: none !important; }
+            html.crossdeck-hide-sidebar main { margin-top: 0 !important; }
+          \`;
+          document.head.appendChild(sidebarStyle);
+        }
+        document.documentElement.classList.add('crossdeck-hide-sidebar');
+
+        const adStyle = document.createElement('style');
+        adStyle.textContent = \`
+          [aria-label="Promoted"],
+          [aria-label*="Promoted"],
+          [aria-label*="プロモーション"],
+          [aria-label*="広告"] {
             display: none !important;
           }
-          /* Adjust main content to fill the space */
-          main {
-            margin-top: 0 !important;
-          }
-          /* Hide obvious X ad markers immediately */
-          [data-testid="placementTracking"],
-          [aria-label="Promoted"] {
-            display: none !important;
-          }
-          /* Hide the ad wrapper used in some timeline placements */
           div[data-testid=cellInnerDiv]:has(path[d="M19.498 3h-15c-1.381 0-2.5 1.12-2.5 2.5v13c0 1.38 1.119 2.5 2.5 2.5h15c1.381 0 2.5-1.12 2.5-2.5v-13c0-1.38-1.119-2.5-2.5-2.5zm-3.502 12h-2v-3.59l-5.293 5.3-1.414-1.42L12.581 10H8.996V8h7v7z"]) {
             display: none;
           }
         \`;
-        document.head.appendChild(style);
-
-        // Also hide header dynamically if loaded later
-        const observer = new MutationObserver(() => {
-          const headers = document.querySelectorAll('header[role="banner"]');
-          headers.forEach(header => {
-            header.style.display = 'none';
-          });
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
+        document.head.appendChild(adStyle);
+        void 0;
       `).catch((err: Error) => {
         console.error('Failed to inject custom scripts:', err);
       });

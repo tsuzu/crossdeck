@@ -10,6 +10,31 @@ interface ProfileData {
 
 let mainWindow: BrowserWindow | null = null;
 const profiles: Map<string, { id: string; session: Session; homepage: string }> = new Map();
+const deniedPermissions = new Set([
+  'clipboard-read',
+  'clipboard-sanitized-write',
+  'display-capture',
+  'geolocation',
+  'hid',
+  'idle-detection',
+  'midi',
+  'midiSysex',
+  'notifications',
+  'openExternal',
+  'pointerLock',
+  'serial',
+  'storage-access',
+  'top-level-storage-access',
+  'usb',
+  'window-management',
+  'keyboardLock',
+  'unknown'
+]);
+
+function isPermissionAllowed(permission: string): boolean {
+  return !deniedPermissions.has(permission);
+}
+
 function getProfilesFilePath(): string {
   return path.join(app.getPath('userData'), 'profiles.json');
 }
@@ -84,15 +109,15 @@ function createWindow() {
   // Setup keyboard shortcuts
   setupMenuShortcuts();
 
-  // Explicitly deny all permission requests to avoid warnings
+  // Deny sensitive permissions while preserving media playback capabilities.
   mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
-    callback(false);
+    callback(isPermissionAllowed(permission));
   });
 
-  // Handle webview permission requests - deny all
+  // Handle webview permission requests.
   mainWindow.webContents.on('did-attach-webview', (event, webviewWebContents) => {
     webviewWebContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
-      callback(false);
+      callback(isPermissionAllowed(permission));
     });
 
     // Open external links in default browser
@@ -181,6 +206,30 @@ function setupMenuShortcuts() {
             mainWindow?.webContents.send('toggle-column-fullscreen');
           }
         },
+        {
+          label: 'Toggle Sidebar',
+          accelerator: isMac ? 'Cmd+\\' : 'Ctrl+\\',
+          click: () => {
+            mainWindow?.webContents.send('toggle-sidebar');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Navigate Back',
+          accelerator: isMac ? 'Cmd+[' : 'Alt+Left',
+          visible: false,
+          click: () => {
+            mainWindow?.webContents.send('navigate-back');
+          }
+        },
+        {
+          label: 'Navigate Forward',
+          accelerator: isMac ? 'Cmd+]' : 'Alt+Right',
+          visible: false,
+          click: () => {
+            mainWindow?.webContents.send('navigate-forward');
+          }
+        },
         { role: 'togglefullscreen' as const },
         { type: 'separator' as const },
         // Add custom tab shortcuts (hidden but active)
@@ -203,10 +252,13 @@ function setupMenuShortcuts() {
   Menu.setApplicationMenu(menu);
 }
 
-// Setup session permissions - deny all to avoid warnings
+// Setup session permissions.
 function setupSessionPermissions(profileSession: Session) {
   profileSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    callback(false);
+    callback(isPermissionAllowed(permission));
+  });
+  profileSession.setPermissionCheckHandler((webContents, permission) => {
+    return isPermissionAllowed(permission);
   });
 }
 
