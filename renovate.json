@@ -1,0 +1,64 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovation-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "timezone": "Asia/Tokyo",
+  "prHourlyLimit": 4,
+  "prConcurrentLimit": 10,
+  "vulnerabilityAlerts": {
+    "labels": [
+      "vulnerability"
+    ],
+    "groupName": "vulnerability alerts"
+  },
+  "osvVulnerabilityAlerts": true,
+  "packageRules": [
+    {
+      "description": "Automerge patch/minor (verified by daily Muse check; CI must be green)",
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    },
+    {
+      "description": "Major updates are always manual review",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "labels": [
+        "major-update"
+      ]
+    },
+    {
+      "description": "Electron: NEVER automerge (any update type) - runtime impact is large, manual review + daily Muse verification",
+      "matchPackageNames": [
+        "electron",
+        "electron-builder"
+      ],
+      "automerge": false,
+      "labels": [
+        "electron",
+        "manual-review"
+      ]
+    },
+    {
+      "description": "TypeScript / Node types major is manual",
+      "matchPackageNames": [
+        "typescript",
+        "@types/node"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "labels": [
+        "major-update"
+      ]
+    }
+  ]
+}
