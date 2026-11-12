@@ -1,5 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovation-schema.json",
+  "dependencyDashboard": {
+    "enabled": true
+  },
   "extends": [
     "config:recommended"
   ],
