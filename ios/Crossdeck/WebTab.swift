@@ -22,7 +22,15 @@ final class WebTab: NSObject, ObservableObject {
     /// desktop renderer's did-navigate / did-navigate-in-page -> saveTabs).
     var onNavigate: ((UUID, String) -> Void)?
 
+    /// Called when the user touches this column's web view, so the column
+    /// becomes the active one. Without this, activation only happened via
+    /// the SwiftUI tap gesture on the column container, which WKWebView
+    /// content touches never reach — so the active tab stayed on the
+    /// leftmost column and every keyboard shortcut acted on it.
+    var onActivate: ((UUID) -> Void)?
+
     private var observations: [NSKeyValueObservation] = []
+    private var interactionRecognizers: [UIGestureRecognizer] = []
     private var autoReloadTimer: Timer?
 
     /// Desktop Safari UA so X serves the desktop layout, like the
@@ -55,6 +63,20 @@ final class WebTab: NSObject, ObservableObject {
         webView.navigationDelegate = self
         webView.uiDelegate = self
 
+        // Activation tracking: any touch (tap or scroll drag) inside the
+        // web view marks this column active. The recognizers observe only —
+        // they never cancel or delay the web view's own handling, and they
+        // recognize simultaneously with its internal recognizers.
+        let tapRecognizer = UITapGestureRecognizer(target: self, action: #selector(handleInteractionGesture))
+        tapRecognizer.cancelsTouchesInView = false
+        tapRecognizer.delegate = self
+        webView.addGestureRecognizer(tapRecognizer)
+        let panRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleInteractionGesture))
+        panRecognizer.cancelsTouchesInView = false
+        panRecognizer.delegate = self
+        webView.addGestureRecognizer(panRecognizer)
+        interactionRecognizers = [tapRecognizer, panRecognizer]
+
         observations.append(webView.observe(\.title, options: [.new]) { [weak self] wv, _ in
             DispatchQueue.main.async { self?.title = wv.title ?? "X / Twitter" }
         })
@@ -81,9 +103,17 @@ final class WebTab: NSObject, ObservableObject {
         observations.forEach { $0.invalidate() }
     }
 
+    @objc private func handleInteractionGesture() {
+        onActivate?(tabID)
+    }
+
     func teardown() {
         autoReloadTimer?.invalidate()
         autoReloadTimer = nil
+        for recognizer in interactionRecognizers {
+            webView.removeGestureRecognizer(recognizer)
+        }
+        interactionRecognizers = []
         observations.forEach { $0.invalidate() }
         observations = []
         webView.stopLoading()
@@ -143,6 +173,12 @@ extension WebTab: WKNavigationDelegate {
             return
         }
         decisionHandler(.allow)
+    }
+}
+
+extension WebTab: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        true
     }
 }
 

@@ -26,4 +26,55 @@ final class CrossdeckUITests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
     }
+
+    /// Regression test: touching a column's web view must make that column
+    /// the active one. Previously activation only came from a SwiftUI tap
+    /// gesture that WKWebView touches never reach, so the active tab stayed
+    /// on the leftmost column and all keyboard shortcuts acted on it.
+    ///
+    /// Observable proxy: column fullscreen applies to the active tab. After
+    /// tapping the FIRST column, fullscreen must show the first (Default)
+    /// column, not the freshly created second one.
+    func testTappingColumnWebViewActivatesThatColumn() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        // Add a second profile.
+        let manageProfiles = app.buttons["Manage profiles"]
+        XCTAssertTrue(manageProfiles.waitForExistence(timeout: 20))
+        manageProfiles.tap()
+        let nameField = app.textFields["Profile name"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 10))
+        nameField.tap()
+        nameField.typeText("Second")
+        app.buttons["Add Profile"].tap()
+        app.buttons["Done"].tap()
+
+        // Open a tab for it (becomes the active tab on creation).
+        let newTab = app.buttons["New tab"]
+        XCTAssertTrue(newTab.waitForExistence(timeout: 10))
+        newTab.tap()
+        let secondItem = app.buttons["Second"]
+        XCTAssertTrue(secondItem.waitForExistence(timeout: 10))
+        secondItem.tap()
+        XCTAssertTrue(app.webViews.element(boundBy: 1).waitForExistence(timeout: 10), "second column did not appear")
+
+        // Touch inside the FIRST column's web view.
+        Thread.sleep(forTimeInterval: 3)
+        app.webViews.element(boundBy: 0).tap()
+
+        // Fullscreen follows the active tab: only Default may remain.
+        let fullscreen = app.buttons["Toggle column fullscreen"]
+        XCTAssertTrue(fullscreen.waitForExistence(timeout: 10))
+        fullscreen.tap()
+
+        let secondBadge = app.staticTexts["Second"]
+        let deadline = Date().addingTimeInterval(10)
+        while Date() < deadline && secondBadge.exists {
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        XCTAssertFalse(secondBadge.exists, "fullscreen showed the second column — tapping the first column did not activate it")
+        XCTAssertTrue(app.staticTexts["Default"].exists)
+        XCTAssertEqual(app.webViews.count, 1)
+    }
 }

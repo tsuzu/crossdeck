@@ -58,6 +58,10 @@ final class AppState: ObservableObject {
         webTab.onNavigate = { [weak self] tabID, url in
             self?.tabDidNavigate(tabID: tabID, url: url)
         }
+        webTab.onActivate = { [weak self] tabID in
+            guard let self, self.activeTabID != tabID else { return }
+            self.activateTab(tabID)
+        }
         webTabs[tab.id] = webTab
         return webTab
     }
