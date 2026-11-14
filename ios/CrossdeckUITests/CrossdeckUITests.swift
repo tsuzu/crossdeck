@@ -76,4 +76,51 @@ final class CrossdeckUITests: XCTestCase {
         XCTAssertFalse(secondBadge.exists, "fullscreen showed the second column — tapping the first column did not activate it")
         XCTAssertTrue(app.staticTexts["Default"].exists)
     }
+
+    /// Regression test: keyboard focus (first responder) must follow the
+    /// tapped column. X's own page shortcuts ("g h", j/k, ...) are
+    /// delivered to whichever web view is first responder; when focus
+    /// stayed on the leftmost web view, keys meant for another column
+    /// were absorbed by the leftmost page.
+    func testTappingColumnMovesKeyboardFocus() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        let manageProfiles = app.buttons["Manage profiles"]
+        XCTAssertTrue(manageProfiles.waitForExistence(timeout: 20))
+        manageProfiles.tap()
+        let nameField = app.textFields["Profile name"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 10))
+        nameField.tap()
+        nameField.typeText("Second")
+        app.buttons["Add Profile"].tap()
+        app.buttons["Done"].tap()
+
+        let newTab = app.buttons["New tab"]
+        XCTAssertTrue(newTab.waitForExistence(timeout: 10))
+        newTab.tap()
+        let secondItem = app.buttons["Second"]
+        XCTAssertTrue(secondItem.waitForExistence(timeout: 10))
+        secondItem.tap()
+
+        let first = app.webViews.element(boundBy: 0)
+        let second = app.webViews.element(boundBy: 1)
+        XCTAssertTrue(second.waitForExistence(timeout: 10), "second column did not appear")
+        Thread.sleep(forTimeInterval: 3)
+
+        second.tap()
+        XCTAssertTrue(waitForKeyboardFocus(second, timeout: 10), "second column's web view did not take keyboard focus after tap")
+
+        first.tap()
+        XCTAssertTrue(waitForKeyboardFocus(first, timeout: 10), "first column's web view did not take keyboard focus after tap")
+    }
+
+    private func waitForKeyboardFocus(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if element.hasFocus { return true }
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        return element.hasFocus
+    }
 }

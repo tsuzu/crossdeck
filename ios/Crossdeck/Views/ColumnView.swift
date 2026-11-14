@@ -43,6 +43,16 @@ private struct ColumnContent: View {
         .background(Color(red: 0.10, green: 0.10, blue: 0.10))
         .contentShape(Rectangle())
         .onTapGesture { state.activateTab(tab.id) }
+        // On first appearance, the initially active column takes keyboard
+        // focus so page shortcuts work from launch. Later appearances
+        // (e.g. after scrolling) must not steal focus, so only the tab
+        // that is active at appearance time does this; activation changes
+        // afterwards go through AppState.activateTab.
+        .onAppear {
+            if state.activeTabID == tab.id {
+                webTab.takeKeyboardFocus()
+            }
+        }
         .dropDestination(for: String.self) { items, _ in
             guard let uuidString = items.first,
                   let draggedID = UUID(uuidString: uuidString) else { return false }

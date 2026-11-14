@@ -107,6 +107,20 @@ final class WebTab: NSObject, ObservableObject {
         onActivate?(tabID)
     }
 
+    /// Move iOS keyboard focus (first responder) to this web view.
+    ///
+    /// Hardware-keyboard key events — including X's own in-page shortcuts
+    /// such as "g h" / "g n" sequences and j/k — are delivered only to the
+    /// page whose web view is first responder. Marking a column active in
+    /// SwiftUI state does NOT move that focus: a web view that once took
+    /// focus (usually the leftmost) keeps it until another web view
+    /// explicitly becomes first responder, so keys kept being absorbed by
+    /// the leftmost column even after activation tracking was fixed.
+    func takeKeyboardFocus() {
+        guard !webView.isFirstResponder else { return }
+        webView.becomeFirstResponder()
+    }
+
     func teardown() {
         autoReloadTimer?.invalidate()
         autoReloadTimer = nil

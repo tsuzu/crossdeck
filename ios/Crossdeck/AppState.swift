@@ -59,8 +59,7 @@ final class AppState: ObservableObject {
             self?.tabDidNavigate(tabID: tabID, url: url)
         }
         webTab.onActivate = { [weak self] tabID in
-            guard let self, self.activeTabID != tabID else { return }
-            self.activateTab(tabID)
+            self?.activateTab(tabID)
         }
         webTabs[tab.id] = webTab
         return webTab
@@ -112,10 +111,16 @@ final class AppState: ObservableObject {
     }
 
     func activateTab(_ tabID: UUID) {
-        activeTabID = tabID
-        if isColumnFullscreen {
-            fullscreenTabID = tabID
+        if activeTabID != tabID {
+            activeTabID = tabID
+            if isColumnFullscreen {
+                fullscreenTabID = tabID
+            }
         }
+        // Keyboard focus follows activation — also when the tab was
+        // already marked active, since the first responder may still be
+        // sitting on another column's web view.
+        webTabs[tabID]?.takeKeyboardFocus()
     }
 
     /// Switch by 1-based position, like the desktop Cmd/Ctrl+1-9 shortcut.
