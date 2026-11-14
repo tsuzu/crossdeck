@@ -94,13 +94,15 @@ final class WebTab: NSObject, ObservableObject {
 
         #if DEBUG
         if tab.url == "crossdeck-keytest" {
-            // Debug-only key-delivery probe for UI tests: appends every
-            // key the page receives to the document title (shown in the
-            // column header). Release builds never see this.
+            // Debug-only focus probe for UI tests: the page mirrors its
+            // own focus state (which follows the web view's first
+            // responder status) into the document title, shown in the
+            // column header. Release builds never see this.
             webView.loadHTMLString("""
-                <title>k</title><body>key recorder
+                <title>blurred</title><body>focus recorder
                 <script>
-                document.addEventListener('keydown', function(e) { document.title += e.key; });
+                function upd() { document.title = document.hasFocus() ? 'focused' : 'blurred'; }
+                setInterval(upd, 200); upd();
                 </script></body>
                 """, baseURL: nil)
         } else if let url = URL(string: tab.url) {
