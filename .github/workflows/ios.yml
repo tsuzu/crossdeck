@@ -1,7 +1,12 @@
 name: iOS
 
 on:
+  # Branch pushes are covered by the pull_request trigger; running push
+  # as well meant every commit was tested twice (and a flake in either
+  # run painted the PR red). Push stays for main only.
   push:
+    branches:
+      - main
     paths:
       - "ios/**"
       - ".github/workflows/ios.yml"

@@ -116,18 +116,40 @@ final class CrossdeckUITests: XCTestCase {
         XCTAssertTrue(recorderTitle.waitForExistence(timeout: 15), "key recorder page did not load")
 
         // Move focus away to the first column, then back to the recorder.
-        app.webViews.element(boundBy: 0).tap()
+        // Tap by coordinates under each column's header: app.webViews
+        // indexing is unreliable here because a page's iframes also show
+        // up as webView elements, which made this test flake (the tap
+        // could land in the first column's iframe instead).
+        tapColumnContent(below: app.staticTexts["Default"], in: app)
         Thread.sleep(forTimeInterval: 1)
-        app.webViews.element(boundBy: 1).tap()
+        tapColumnContent(below: recorderTitle, in: app)
         Thread.sleep(forTimeInterval: 1)
 
-        app.typeKey("z", modifierFlags: [])
-
-        let updatedTitle = app.staticTexts["kz"]
-        let deadline = Date().addingTimeInterval(10)
-        while Date() < deadline && !updatedTitle.exists {
-            Thread.sleep(forTimeInterval: 0.5)
+        // Type with retries; each delivered key appends one character, so
+        // any title starting with "kz" proves delivery to this column.
+        let delivered = app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'kz'")).firstMatch
+        var attempts = 0
+        while attempts < 3 && !delivered.exists {
+            app.typeKey("z", modifierFlags: [])
+            attempts += 1
+            let deadline = Date().addingTimeInterval(4)
+            while Date() < deadline && !delivered.exists {
+                Thread.sleep(forTimeInterval: 0.5)
+            }
         }
-        XCTAssertTrue(updatedTitle.exists, "typed key was not delivered to the tapped column's page (title stayed 'k')")
+        XCTAssertTrue(delivered.exists, "typed key was not delivered to the tapped column's page (title stayed 'k')")
+    }
+
+    /// Tap inside a column's web view area, addressed by a header element
+    /// belonging to that column (badge or title), 120pt below the header.
+    private func tapColumnContent(below headerElement: XCUIElement, in app: XCUIApplication) {
+        XCTAssertTrue(headerElement.waitForExistence(timeout: 10), "header element not found")
+        let headerFrame = headerElement.frame
+        let window = app.frame
+        let point = app.coordinate(withNormalizedOffset: CGVector(
+            dx: (headerFrame.minX + 60) / window.width,
+            dy: (headerFrame.maxY + 120) / window.height
+        ))
+        point.tap()
     }
 }
