@@ -46,7 +46,7 @@ final class CrossdeckUITests: XCTestCase {
         let nameField = app.textFields["Profile name"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 10))
         nameField.tap()
-        nameField.typeText("Second")
+        nameField.typeText("SecondA")
         app.buttons["Add Profile"].tap()
         app.buttons["Done"].tap()
 
@@ -54,7 +54,7 @@ final class CrossdeckUITests: XCTestCase {
         let newTab = app.buttons["New tab"]
         XCTAssertTrue(newTab.waitForExistence(timeout: 10))
         newTab.tap()
-        let secondItem = app.buttons["Second"]
+        let secondItem = app.buttons["SecondA"]
         XCTAssertTrue(secondItem.waitForExistence(timeout: 10))
         secondItem.tap()
         XCTAssertTrue(app.webViews.element(boundBy: 1).waitForExistence(timeout: 10), "second column did not appear")
@@ -68,7 +68,7 @@ final class CrossdeckUITests: XCTestCase {
         XCTAssertTrue(fullscreen.waitForExistence(timeout: 10))
         fullscreen.tap()
 
-        let secondBadge = app.staticTexts["Second"]
+        let secondBadge = app.staticTexts["SecondA"]
         let deadline = Date().addingTimeInterval(10)
         while Date() < deadline && secondBadge.exists {
             Thread.sleep(forTimeInterval: 0.5)
@@ -82,7 +82,12 @@ final class CrossdeckUITests: XCTestCase {
     /// delivered to whichever web view is first responder; when focus
     /// stayed on the leftmost web view, keys meant for another column
     /// were absorbed by the leftmost page.
-    func testTappingColumnMovesKeyboardFocus() throws {
+    ///
+    /// Functional check with the debug key-recorder page (homepage
+    /// "crossdeck-keytest", DEBUG builds only): it appends received keys
+    /// to its title, visible as the column header. Type a key after
+    /// tapping that column and the header must change to "kz".
+    func testTappingColumnDeliversKeysToThatColumn() throws {
         let app = XCUIApplication()
         app.launch()
 
@@ -92,35 +97,37 @@ final class CrossdeckUITests: XCTestCase {
         let nameField = app.textFields["Profile name"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 10))
         nameField.tap()
-        nameField.typeText("Second")
+        nameField.typeText("KeysF")
+        let homepageField = app.textFields["Homepage URL (default: https://x.com)"]
+        XCTAssertTrue(homepageField.waitForExistence(timeout: 10))
+        homepageField.tap()
+        homepageField.typeText("crossdeck-keytest")
         app.buttons["Add Profile"].tap()
         app.buttons["Done"].tap()
 
         let newTab = app.buttons["New tab"]
         XCTAssertTrue(newTab.waitForExistence(timeout: 10))
         newTab.tap()
-        let secondItem = app.buttons["Second"]
-        XCTAssertTrue(secondItem.waitForExistence(timeout: 10))
-        secondItem.tap()
+        let keysItem = app.buttons["KeysF"]
+        XCTAssertTrue(keysItem.waitForExistence(timeout: 10))
+        keysItem.tap()
 
-        let first = app.webViews.element(boundBy: 0)
-        let second = app.webViews.element(boundBy: 1)
-        XCTAssertTrue(second.waitForExistence(timeout: 10), "second column did not appear")
-        Thread.sleep(forTimeInterval: 3)
+        let recorderTitle = app.staticTexts["k"]
+        XCTAssertTrue(recorderTitle.waitForExistence(timeout: 15), "key recorder page did not load")
 
-        second.tap()
-        XCTAssertTrue(waitForKeyboardFocus(second, timeout: 10), "second column's web view did not take keyboard focus after tap")
+        // Move focus away to the first column, then back to the recorder.
+        app.webViews.element(boundBy: 0).tap()
+        Thread.sleep(forTimeInterval: 1)
+        app.webViews.element(boundBy: 1).tap()
+        Thread.sleep(forTimeInterval: 1)
 
-        first.tap()
-        XCTAssertTrue(waitForKeyboardFocus(first, timeout: 10), "first column's web view did not take keyboard focus after tap")
-    }
+        app.typeKey("z", modifierFlags: [])
 
-    private func waitForKeyboardFocus(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if element.hasFocus { return true }
+        let updatedTitle = app.staticTexts["kz"]
+        let deadline = Date().addingTimeInterval(10)
+        while Date() < deadline && !updatedTitle.exists {
             Thread.sleep(forTimeInterval: 0.5)
         }
-        return element.hasFocus
+        XCTAssertTrue(updatedTitle.exists, "typed key was not delivered to the tapped column's page (title stayed 'k')")
     }
 }

@@ -92,9 +92,25 @@ final class WebTab: NSObject, ObservableObject {
             }
         })
 
+        #if DEBUG
+        if tab.url == "crossdeck-keytest" {
+            // Debug-only key-delivery probe for UI tests: appends every
+            // key the page receives to the document title (shown in the
+            // column header). Release builds never see this.
+            webView.loadHTMLString("""
+                <title>k</title><body>key recorder
+                <script>
+                document.addEventListener('keydown', function(e) { document.title += e.key; });
+                </script></body>
+                """, baseURL: nil)
+        } else if let url = URL(string: tab.url) {
+            webView.load(URLRequest(url: url))
+        }
+        #else
         if let url = URL(string: tab.url) {
             webView.load(URLRequest(url: url))
         }
+        #endif
         restartAutoReloadTimer()
     }
 
