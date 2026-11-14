@@ -72,7 +72,9 @@ private struct ColumnContent: View {
             } label: {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 12))
-                    .foregroundColor(tab.autoReloadEnabled ? Color(red: 0.11, green: 0.63, blue: 0.95) : .gray)
+                    // Enabled = blue, except on the active (blue) header
+                    // where it must be white to stay visible.
+                    .foregroundColor(tab.autoReloadEnabled ? (isActive ? .white : Color(red: 0.11, green: 0.63, blue: 0.95)) : .gray)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Auto-reload")
