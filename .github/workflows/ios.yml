@@ -1,0 +1,82 @@
+name: iOS
+
+on:
+  push:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  pull_request:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build for iOS Simulator
+        working-directory: ios
+        run: |
+          xcodebuild -project Crossdeck.xcodeproj -scheme Crossdeck \
+            -configuration Debug -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build-sim build
+
+      - name: Smoke test on iPad simulator
+        working-directory: ios
+        run: |
+          UDID=$(xcrun simctl list devices available | grep -m1 'iPad' | sed -E 's/.*\(([0-9A-F-]+)\).*/\1/')
+          echo "Using simulator $UDID"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          APP=$(find build-sim/Build/Products/Debug-iphonesimulator -maxdepth 1 -name '*.app' | head -1)
+          echo "App: $APP"
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl launch "$UDID" com.crossdeck.app
+          sleep 12
+          xcrun simctl io "$UDID" screenshot sim-launch.png
+          # Fail the job if the app process is already gone (crashed on launch)
+          xcrun simctl spawn "$UDID" launchctl list | grep -i crossdeck || \
+            (echo "crossdeck process not found after launch" && exit 1)
+
+      - name: Upload launch screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-launch-screenshot
+          path: ios/sim-launch.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Build for device and package unsigned .ipa
+        working-directory: ios
+        run: |
+          xcodebuild -project Crossdeck.xcodeproj -scheme Crossdeck \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -derivedDataPath build-device build
+          APP=$(find build-device/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -1)
+          echo "App: $APP"
+          rm -rf Payload crossdeck.ipa
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -r crossdeck.ipa Payload
+
+      - name: Upload .ipa (unsigned, for AltStore sideloading)
+        uses: actions/upload-artifact@v4
+        with:
+          name: crossdeck-ios-ipa
+          path: ios/crossdeck.ipa
+          retention-days: 7

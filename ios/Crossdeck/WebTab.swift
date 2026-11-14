@@ -1,0 +1,151 @@
+import Foundation
+import UIKit
+import WebKit
+
+/// One column's live web view, kept alive outside the SwiftUI view tree so
+/// that re-renders never recreate it (recreating a WKWebView loses the page
+/// and, with a fresh data-store object, the shared WebKit process).
+final class WebTab: NSObject, ObservableObject {
+    let tabID: UUID
+    let webView: WKWebView
+
+    @Published var title: String = "X / Twitter"
+    @Published var estimatedProgress: Double = 0
+    @Published var canGoBack: Bool = false
+    @Published var canGoForward: Bool = false
+
+    var autoReloadEnabled: Bool {
+        didSet { restartAutoReloadTimer() }
+    }
+
+    /// Called on every navigation with the tab's current URL (mirrors the
+    /// desktop renderer's did-navigate / did-navigate-in-page -> saveTabs).
+    var onNavigate: ((UUID, String) -> Void)?
+
+    private var observations: [NSKeyValueObservation] = []
+    private var autoReloadTimer: Timer?
+
+    /// Desktop Safari UA so X serves the desktop layout, like the
+    /// Electron (Chromium desktop) build does.
+    private static let desktopUserAgent =
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
+
+    init(tab: TabData) {
+        self.tabID = tab.id
+        self.autoReloadEnabled = tab.autoReloadEnabled
+
+        let config = WKWebViewConfiguration()
+        // Profile isolation: one persistent data store per profile UUID.
+        config.websiteDataStore = DataStoreCache.shared.store(for: tab.profileID)
+        config.allowsInlineMediaPlayback = true
+
+        let controller = WKUserContentController()
+        controller.addUserScript(WKUserScript(source: Scripts.styleScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false))
+        controller.addUserScript(WKUserScript(source: Scripts.cleanupScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false))
+        config.userContentController = controller
+
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.customUserAgent = Self.desktopUserAgent
+        webView.allowsBackForwardNavigationGestures = false
+        webView.scrollView.backgroundColor = UIColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1)
+        self.webView = webView
+
+        super.init()
+
+        webView.navigationDelegate = self
+        webView.uiDelegate = self
+
+        observations.append(webView.observe(\.title, options: [.new]) { [weak self] wv, _ in
+            DispatchQueue.main.async { self?.title = wv.title ?? "X / Twitter" }
+        })
+        observations.append(webView.observe(\.estimatedProgress, options: [.new]) { [weak self] wv, _ in
+            DispatchQueue.main.async { self?.estimatedProgress = wv.estimatedProgress }
+        })
+        observations.append(webView.observe(\.url, options: [.new]) { [weak self] wv, _ in
+            guard let self, let url = wv.url?.absoluteString else { return }
+            DispatchQueue.main.async {
+                self.canGoBack = wv.canGoBack
+                self.canGoForward = wv.canGoForward
+                self.onNavigate?(self.tabID, url)
+            }
+        })
+
+        if let url = URL(string: tab.url) {
+            webView.load(URLRequest(url: url))
+        }
+        restartAutoReloadTimer()
+    }
+
+    deinit {
+        autoReloadTimer?.invalidate()
+        observations.forEach { $0.invalidate() }
+    }
+
+    func teardown() {
+        autoReloadTimer?.invalidate()
+        autoReloadTimer = nil
+        observations.forEach { $0.invalidate() }
+        observations = []
+        webView.stopLoading()
+        webView.navigationDelegate = nil
+        webView.uiDelegate = nil
+        webView.removeFromSuperview()
+    }
+
+    // MARK: - Actions (mirror the desktop menu shortcuts)
+
+    func reload() { webView.reload() }
+    func goBack() { if webView.canGoBack { webView.goBack() } }
+    func goForward() { if webView.canGoForward { webView.goForward() } }
+
+    func zoomReset() { webView.pageZoom = 1.0 }
+    func zoomIn() { webView.pageZoom = min(webView.pageZoom * 1.2, 3.0) }
+    func zoomOut() { webView.pageZoom = max(webView.pageZoom / 1.2, 0.5) }
+
+    func toggleSidebar() {
+        webView.evaluateJavaScript("document.documentElement.classList.toggle('crossdeck-hide-sidebar'); void 0;")
+    }
+
+    // MARK: - Auto-reload (desktop: 15s interval per tab)
+
+    private func restartAutoReloadTimer() {
+        autoReloadTimer?.invalidate()
+        autoReloadTimer = nil
+        guard autoReloadEnabled else { return }
+        autoReloadTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
+            self?.runAutoReloadProbe()
+        }
+    }
+
+    private func runAutoReloadProbe() {
+        webView.evaluateJavaScript(Scripts.autoReloadProbe) { _, _ in }
+    }
+}
+
+extension WebTab: WKNavigationDelegate {
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let url = navigationAction.request.url, let scheme = url.scheme?.lowercased() else {
+            decisionHandler(.allow)
+            return
+        }
+        // Non-web schemes (mailto:, tel:, app deep links) go to the system,
+        // like Electron's shell.openExternal.
+        if !["http", "https", "about", "file", "data"].contains(scheme) {
+            UIApplication.shared.open(url)
+            decisionHandler(.cancel)
+            return
+        }
+        decisionHandler(.allow)
+    }
+}
+
+extension WebTab: WKUIDelegate {
+    /// window.open / target=_blank: load in the same column instead of
+    /// dropping the navigation (desktop allows popups in the webview).
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        if navigationAction.targetFrame == nil || navigationAction.targetFrame?.isMainFrame == false {
+            webView.load(navigationAction.request)
+        }
+        return nil
+    }
+}

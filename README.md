@@ -15,6 +15,13 @@ Old Tweetdeck Alternative
 - **Clean Interface**: Dark-themed, distraction-free browsing experience with X/Twitter header automatically hidden
 - **Profile Management**: Create, rename, and delete profiles through the settings modal
 
+## iPad Version
+
+A native iPad port (SwiftUI + WKWebView, iPadOS 17+) lives in [`ios/`](ios/).
+It reproduces the desktop behaviour — per-profile isolated sessions,
+horizontal columns, auto-reload — using `WKWebsiteDataStore(forIdentifier:)`
+in place of Electron partitions. See [ios/README.md](ios/README.md).
+
 ## Limitations
 
 - **WebAuthn/Passkeys**: Not supported due to Electron sandboxing limitations. Use traditional password authentication instead.
