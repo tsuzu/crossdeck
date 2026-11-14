@@ -85,3 +85,87 @@ jobs:
           name: crossdeck-ios-ipa
           path: ios/crossdeck.ipa
           retention-days: 7
+
+  # Publishes the built .ipa as a GitHub Release and regenerates the
+  # AltStore/SideStore source (apps.json at the repo root) so the app can
+  # be installed and updated from AltStore Classic or SideStore:
+  #   https://raw.githubusercontent.com/tsuzu/crossdeck/main/apps.json
+  # Runs only on main (merges and manual dispatches), never on PRs.
+  publish:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Download .ipa artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: crossdeck-ios-ipa
+          path: dist
+
+      - name: Publish release and update apps.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(grep -m1 'MARKETING_VERSION' ios/project.yml | sed -E 's/.*"([^"]+)".*/\1/')
+          TAG="ios-v$VERSION"
+          echo "Publishing $TAG"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "crossdeck iOS $VERSION" \
+              --notes "Unsigned .ipa of the crossdeck iPad app. Install via the AltStore/SideStore source: https://raw.githubusercontent.com/tsuzu/crossdeck/main/apps.json"
+          fi
+          gh release upload "$TAG" dist/crossdeck.ipa --clobber
+          SIZE=$(stat -c%s dist/crossdeck.ipa)
+          DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          python3 - "$VERSION" "$SIZE" "$DATE" <<'PYEOF'
+          import json, os, sys
+          version, size, date = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+          # Keep the existing file (and its versionDate) when neither the
+          # version nor the binary changed, to avoid a churn commit on
+          # every main run.
+          if os.path.exists("apps.json"):
+              try:
+                  current = json.load(open("apps.json"))["apps"][0]
+                  if current.get("version") == version and current.get("size") == size:
+                      print("apps.json already current; leaving as is")
+                      sys.exit(0)
+              except Exception:
+                  pass
+          source = {
+              "name": "crossdeck (tsuzu)",
+              "identifier": "dev.tsuzu.crossdeck",
+              "subtitle": "tsuzu's apps",
+              "description": "Source for tsuzu's sideloaded apps. Add this URL in AltStore Classic or SideStore to install and update crossdeck for iPad.",
+              "apps": [{
+                  "name": "crossdeck",
+                  "bundleIdentifier": "com.crossdeck.app",
+                  "developerName": "tsuzu",
+                  "subtitle": "Multi-profile X browser for iPad",
+                  "localizedDescription": "Native iPad port of the crossdeck desktop app: multiple X profiles (isolated logins) as side-by-side columns, tab persistence, auto-reload, promoted-post hiding and hardware-keyboard shortcuts.",
+                  "iconURL": "https://raw.githubusercontent.com/tsuzu/crossdeck/main/ios/Crossdeck/Assets.xcassets/AppIcon.appiconset/icon-1024.png",
+                  "tintColor": "#1d9bf0",
+                  "version": version,
+                  "versionDate": date,
+                  "versionDescription": f"See GitHub release ios-v{version}.",
+                  "downloadURL": f"https://github.com/tsuzu/crossdeck/releases/download/ios-v{version}/crossdeck.ipa",
+                  "size": size,
+              }],
+              "news": [],
+          }
+          with open("apps.json", "w") as f:
+              json.dump(source, f, indent=2, sort_keys=True)
+              f.write("\n")
+          PYEOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps.json
+          if git diff --cached --quiet; then
+            echo "apps.json unchanged"
+          else
+            git commit -m "chore(ios): update AltStore source to $VERSION"
+            git push origin HEAD:main
+          fi

@@ -31,6 +31,32 @@ Known intentional differences:
 - `window.open` loads in the same column instead of a popup window.
 - A desktop Safari user agent is sent so X serves the desktop layout.
 
+## Installing (AltStore Classic / SideStore)
+
+The app is published as an AltStore source, so it can be installed and
+updated from AltStore Classic or SideStore without handling .ipa files:
+
+1. Copy this source URL:
+
+   ```
+   https://raw.githubusercontent.com/tsuzu/crossdeck/main/apps.json
+   ```
+
+2. AltStore Classic: **Browse** tab -> **Sources** (top right) -> **+**
+   -> paste the URL -> **Add**.
+   SideStore: **Sources** tab -> **+** -> paste the URL.
+3. Install **crossdeck** from the source. Updates appear in the store
+   app automatically when a new version is published.
+
+How publishing works: every merge to `main` rebuilds the .ipa in
+`.github/workflows/ios.yml`; the `publish` job then uploads it to the
+GitHub Release `ios-v<VERSION>` and regenerates `apps.json` at the
+repository root (version / size / date) if they changed.
+
+Manual fallback: download `crossdeck.ipa` from the
+[`ios-v*` releases](https://github.com/tsuzu/crossdeck/releases) and add
+it via **My Apps -> +** in AltStore, or through AltKeeper.
+
 ## Building
 
 The Xcode project is generated with [XcodeGen](https://github.com/yonaskolb/XcodeGen):
