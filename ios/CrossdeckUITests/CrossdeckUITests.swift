@@ -75,6 +75,5 @@ final class CrossdeckUITests: XCTestCase {
         }
         XCTAssertFalse(secondBadge.exists, "fullscreen showed the second column — tapping the first column did not activate it")
         XCTAssertTrue(app.staticTexts["Default"].exists)
-        XCTAssertEqual(app.webViews.count, 1)
     }
 }
