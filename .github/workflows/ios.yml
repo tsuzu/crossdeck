@@ -35,29 +35,29 @@ jobs:
             -configuration Debug -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build-sim build
 
-      - name: Smoke test on iPad simulator
+      - name: UI test on iPad simulator (launch, app chrome, web view, screenshot)
         working-directory: ios
         run: |
           UDID=$(xcrun simctl list devices available | grep -m1 'iPad' | sed -E 's/.*\(([0-9A-F-]+)\).*/\1/')
           echo "Using simulator $UDID"
-          xcrun simctl boot "$UDID" || true
-          xcrun simctl bootstatus "$UDID" -b
-          APP=$(find build-sim/Build/Products/Debug-iphonesimulator -maxdepth 1 -name '*.app' | head -1)
-          echo "App: $APP"
-          xcrun simctl install "$UDID" "$APP"
-          xcrun simctl launch "$UDID" com.crossdeck.app
-          sleep 12
-          xcrun simctl io "$UDID" screenshot sim-launch.png
-          # Fail the job if the app process is already gone (crashed on launch)
-          xcrun simctl spawn "$UDID" launchctl list | grep -i crossdeck || \
-            (echo "crossdeck process not found after launch" && exit 1)
+          xcodebuild test -project Crossdeck.xcodeproj -scheme Crossdeck \
+            -destination "platform=iOS Simulator,id=$UDID" \
+            -derivedDataPath build-test \
+            -resultBundlePath TestResults.xcresult
 
-      - name: Upload launch screenshot
+      - name: Extract UI test screenshot
+        if: always()
+        working-directory: ios
+        run: |
+          xcrun xcresulttool export attachments --path TestResults.xcresult --output-path ui-attachments || true
+          find ui-attachments -type f 2>/dev/null | head -20 || true
+
+      - name: Upload UI test screenshot
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-launch-screenshot
-          path: ios/sim-launch.png
+          name: ios-ui-test-screenshot
+          path: ios/ui-attachments
           if-no-files-found: ignore
           retention-days: 7
 

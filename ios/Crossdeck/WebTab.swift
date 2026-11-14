@@ -128,10 +128,17 @@ extension WebTab: WKNavigationDelegate {
             decisionHandler(.allow)
             return
         }
-        // Non-web schemes (mailto:, tel:, app deep links) go to the system,
-        // like Electron's shell.openExternal.
-        if !["http", "https", "about", "file", "data"].contains(scheme) {
+        // Only a small set of user-facing schemes goes to the system.
+        // Everything else non-web (app deep links such as twitter:// that
+        // pages attempt automatically on load, App Store schemes, ...) is
+        // cancelled silently: opening it would yank the user out of the app
+        // into Safari / another app, unlike a deliberate link tap.
+        if ["mailto", "tel", "sms"].contains(scheme) {
             UIApplication.shared.open(url)
+            decisionHandler(.cancel)
+            return
+        }
+        if !["http", "https", "about", "file", "data"].contains(scheme) {
             decisionHandler(.cancel)
             return
         }

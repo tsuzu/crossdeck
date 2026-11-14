@@ -30,11 +30,29 @@ targets:
         CODE_SIGNING_ALLOWED: "NO"
         CODE_SIGNING_REQUIRED: "NO"
         CODE_SIGN_IDENTITY: ""
+  CrossdeckUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: CrossdeckUITests
+    dependencies:
+      - target: Crossdeck
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.crossdeck.app.uitests
+        GENERATE_INFOPLIST_FILE: "YES"
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGN_IDENTITY: ""
 schemes:
   Crossdeck:
     build:
       targets:
         Crossdeck: all
+        CrossdeckUITests: [test]
+    test:
+      targets:
+        - CrossdeckUITests
     run:
       config: Debug
     archive:
