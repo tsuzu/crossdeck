@@ -1,0 +1,87 @@
+name: iOS
+
+on:
+  # Branch pushes are covered by the pull_request trigger; running push
+  # as well meant every commit was tested twice (and a flake in either
+  # run painted the PR red). Push stays for main only.
+  push:
+    branches:
+      - main
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  pull_request:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build for iOS Simulator
+        working-directory: ios
+        run: |
+          xcodebuild -project Crossdeck.xcodeproj -scheme Crossdeck \
+            -configuration Debug -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build-sim build
+
+      - name: UI test on iPad simulator (launch, app chrome, web view, screenshot)
+        working-directory: ios
+        run: |
+          UDID=$(xcrun simctl list devices available | grep -m1 'iPad' | sed -E 's/.*\(([0-9A-F-]+)\).*/\1/')
+          echo "Using simulator $UDID"
+          xcodebuild test -project Crossdeck.xcodeproj -scheme Crossdeck \
+            -destination "platform=iOS Simulator,id=$UDID" \
+            -derivedDataPath build-test \
+            -resultBundlePath TestResults.xcresult
+
+      - name: Extract UI test screenshot
+        if: always()
+        working-directory: ios
+        run: |
+          xcrun xcresulttool export attachments --path TestResults.xcresult --output-path ui-attachments || true
+          find ui-attachments -type f 2>/dev/null | head -20 || true
+
+      - name: Upload UI test screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ui-test-screenshot
+          path: ios/ui-attachments
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Build for device and package unsigned .ipa
+        working-directory: ios
+        run: |
+          xcodebuild -project Crossdeck.xcodeproj -scheme Crossdeck \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -derivedDataPath build-device build
+          APP=$(find build-device/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -1)
+          echo "App: $APP"
+          rm -rf Payload crossdeck.ipa
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -r crossdeck.ipa Payload
+
+      - name: Upload .ipa (unsigned, for AltStore sideloading)
+        uses: actions/upload-artifact@v4
+        with:
+          name: crossdeck-ios-ipa
+          path: ios/crossdeck.ipa
+          retention-days: 7
